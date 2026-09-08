@@ -19,6 +19,8 @@
 
 🐛 修复
 - `resourceType` 兜底：URL 无媒体扩展名、MIME 不明确但浏览器判定为 media/video/audio 的资源，此前漏抓，现正确归类（参考猫抓"后缀 → MIME → 附件名 + resourceType 兜底"四路判定）
+- 修复个别 Edge/Chrome 环境 Service Worker 注册失败（`Status code: 15`）：所有顶层 `chrome.*` 监听器注册统一改用安全包装（`safeOn`），单个 API 缺失时仅告警不崩溃，确保核心抓取能力不因某一 API 不可用而整体失效
+- 修复扩展重载瞬间 content script 抛出 `Invalid context` 报错：`chrome.runtime.sendMessage` / `onMessage` 增加 try/catch 兜底，避免污染控制台
 
 ## v0.2.1 2026-09-08
 

@@ -29,6 +29,21 @@
 
 importScripts('media-parser.js', 'm3u8-parser.js', 'mpd-parser.js');
 
+// ---------- 安全 listener 注册 helper ----------
+// v0.2.2 修复：所有新加的 chrome API 调用用 try/catch 包装，
+// 防止单个 API 在某些 Edge/Chrome 版本不可用时导致整个 SW 注册失败（Status 15）。
+function safeOn(ns, event, fn, ...args) {
+  try {
+    if (ns && ns[event] && typeof ns[event].addListener === 'function') {
+      ns[event].addListener(fn, ...args);
+    } else {
+      console.warn('[SW]', event, 'unavailable (namespace missing)');
+    }
+  } catch (e) {
+    console.warn('[SW] addListener', event, 'failed:', String(e && e.message || e));
+  }
+}
+
 // 内存存储：tabId -> Map<normalizedUrl, resource>
 // 同时镜像到 chrome.storage.session，SW 休眠重启后可从 storage 恢复。
 const store = new Map();
@@ -89,21 +104,25 @@ function restoreFromStorage() {
     sweepOrphanTabs();
   });
 }
-restoreFromStorage();
+try { restoreFromStorage(); } catch (e) { console.warn('[SW] restoreFromStorage failed:', String(e && e.message || e)); }
 
 // 启动时读取上次保存的抓取模式
-chrome.storage.local.get('captureMode', (result) => {
-  if (chrome.runtime.lastError) return;
-  const v = result && result.captureMode;
-  if (v === 'deep' || v === 'default') currentCaptureMode = v;
-});
+try {
+  chrome.storage.local.get('captureMode', (result) => {
+    if (chrome.runtime.lastError) return;
+    const v = result && result.captureMode;
+    if (v === 'deep' || v === 'default') currentCaptureMode = v;
+  });
+} catch (e) { console.warn('[SW] storage.local.get failed:', String(e && e.message || e)); }
 
 // ---------- SW 生命周期：alarms 定时唤醒 ----------
 // 参考猫抓用 alarms 定时调度的思想，这里用作 SW 心跳：
 // alarm 触发本身会唤醒 SW，从而重新注册 webRequest 监听器，
 // 并顺便回收孤儿 tab。periodInMinutes 5 分钟权衡了唤醒频率与开销。
-chrome.alarms.create('media-heartbeat', { periodInMinutes: 5 });
-chrome.alarms.onAlarm.addListener((alarm) => {
+try {
+  chrome.alarms.create('media-heartbeat', { periodInMinutes: 5 });
+} catch (e) { console.warn('[SW] alarms.create unavailable:', String(e && e.message || e)); }
+safeOn(chrome.alarms, 'onAlarm', (alarm) => {
   if (alarm.name === 'media-heartbeat') sweepOrphanTabs();
 });
 
@@ -111,13 +130,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // onBeforeNavigate / onCommitted 本身就是 MV3 的 SW 唤醒事件。
 // 主框架（frameId === 0）导航提交时清空该 tab 的抓取数据，
 // 解决"页面刷新 / 跳转后数据残留错乱"问题（参考猫抓 autoClear 思想）。
-chrome.webNavigation.onCommitted.addListener((details) => {
+safeOn(chrome.webNavigation, 'onCommitted', (details) => {
   if (details.frameId === 0) clearTabData(details.tabId);
 });
 
 // ---------- SW 生命周期：onConnect 长连接保活 ----------
 // popup 打开期间保持 SW 活跃，避免长驻弹窗时 SW 被回收。
-chrome.runtime.onConnect.addListener((port) => {
+safeOn(chrome.runtime, 'onConnect', (port) => {
   if (port.name !== 'media-heartbeat') return;
   const keepAlive = setInterval(() => {
     try { port.postMessage({ type: 'ping' }); }
@@ -235,7 +254,7 @@ function shouldAcceptNetworkImage(url, size, mode) {
 }
 
 // ---------- 监听请求开始 ----------
-chrome.webRequest.onBeforeRequest.addListener((details) => {
+safeOn(chrome.webRequest, 'onBeforeRequest', (details) => {
   const { tabId, url } = details;
   if (tabId < 0) return; // 后台请求无归属 tab，忽略
   if (isTrackingUrl(url)) return;
@@ -258,14 +277,14 @@ chrome.webRequest.onBeforeRequest.addListener((details) => {
 }, { urls: ['<all_urls>'] });
 
 // ---------- 监听请求头：暂存 referer（用于防盗链识别） ----------
-chrome.webRequest.onSendHeaders.addListener((details) => {
+safeOn(chrome.webRequest, 'onSendHeaders', (details) => {
   if (details.tabId < 0) return;
   const referer = getHeaderValue(details.requestHeaders, 'referer');
   if (referer) requestReferer.set(details.requestId, referer);
 }, { urls: ['<all_urls>'] }, ['requestHeaders', 'extraHeaders']);
 
 // ---------- 监听响应完成：补全 MIME/大小 + 过滤垃圾 ----------
-chrome.webRequest.onCompleted.addListener((details) => {
+safeOn(chrome.webRequest, 'onCompleted', (details) => {
   const { tabId, url, responseHeaders, type: resourceType } = details;
   if (tabId < 0) return;
   if (isTrackingUrl(url)) return;
@@ -316,17 +335,17 @@ chrome.webRequest.onCompleted.addListener((details) => {
 }, { urls: ['<all_urls>'] }, ['responseHeaders']);
 
 // ---------- 监听请求失败：清理 referer 暂存 ----------
-chrome.webRequest.onErrorOccurred.addListener((details) => {
+safeOn(chrome.webRequest, 'onErrorOccurred', (details) => {
   requestReferer.delete(details.requestId);
 });
 
 // ---------- 标签页关闭时清理 ----------
-chrome.tabs.onRemoved.addListener((tabId) => {
+safeOn(chrome.tabs, 'onRemoved', (tabId) => {
   clearTabData(tabId);
 });
 
 // ---------- 消息路由 ----------
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
   if (!msg || !msg.action) return;
 
   switch (msg.action) {

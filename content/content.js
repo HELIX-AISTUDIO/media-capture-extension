@@ -66,10 +66,14 @@ function reportResources(items) {
     return true;
   });
   if (fresh.length === 0) return;
-  chrome.runtime.sendMessage(
-    { action: 'addDomResources', items: fresh },
-    () => void chrome.runtime.lastError
-  );
+  try {
+    chrome.runtime.sendMessage(
+      { action: 'addDomResources', items: fresh },
+      () => void chrome.runtime.lastError
+    );
+  } catch (e) {
+    // 扩展上下文失效（如重载瞬间）时忽略，避免 "Invalid context" 污染控制台
+  }
 }
 
 // ---------- 劫持 HTMLMediaElement.prototype.src ----------
@@ -275,23 +279,27 @@ if (document.readyState === 'complete') {
 
 // ---------- 抓取模式同步与重扫 ----------
 // 启动时向后台读取当前模式
-chrome.runtime.sendMessage({ action: 'getMode' }, (resp) => {
-  if (chrome.runtime.lastError) return;
-  if (resp && resp.ok) captureMode = resp.mode === 'deep' ? 'deep' : 'default';
-});
+try {
+  chrome.runtime.sendMessage({ action: 'getMode' }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    if (resp && resp.ok) captureMode = resp.mode === 'deep' ? 'deep' : 'default';
+  });
+} catch (e) { /* 扩展上下文失效时忽略 */ }
 
 // 监听后台/弹窗下发的模式切换与重扫指令
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg || !msg.action) return;
-  if (msg.action === 'setMode') {
-    captureMode = msg.mode === 'deep' ? 'deep' : 'default';
-    return;
-  }
-  if (msg.action === 'rescan') {
-    // 清空去重集合，允许已上报资源被重新上报
-    reported.clear();
-    // 立即重扫媒体与图片（缓存捕捉由常规轮询兜底）
-    reportResources(scanMedia().concat(scanImages()));
-    return;
-  }
-});
+try {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || !msg.action) return;
+    if (msg.action === 'setMode') {
+      captureMode = msg.mode === 'deep' ? 'deep' : 'default';
+      return;
+    }
+    if (msg.action === 'rescan') {
+      // 清空去重集合，允许已上报资源被重新上报
+      reported.clear();
+      // 立即重扫媒体与图片（缓存捕捉由常规轮询兜底）
+      reportResources(scanMedia().concat(scanImages()));
+      return;
+    }
+  });
+} catch (e) { /* 忽略 */ }
