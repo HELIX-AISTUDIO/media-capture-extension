@@ -1,8 +1,31 @@
 # 更新日志
 
 > 本文件所有版本按时间**倒序**排列，最新版本永远写在最上方。
-> 分类固定为三类：✨ 新增、🔧 优化、🐛 修复。
+> 分类按版本内容使用 ✨ 新增、🔧 优化、🐛 修复、📝 更新等标签。
 > 每次发布时，请保证：`CHANGELOG.md 版本号 = git tag 版本号 = manifest.json version`。
+
+## v0.2.2 2026-09-08
+
+✨ 新增
+- SW 生命周期健壮性：`chrome.alarms` 定时唤醒 + `webNavigation` 导航唤醒 + `onConnect` 长连接保活，解决 SW 休眠后 webRequest 监听失效、抓取中断的问题（参考猫抓对抗 MV3 休眠的"接受必死 + 自愈 + 按需保活"思想，独立实现）
+- `onSendHeaders` 捕获 Referer 请求头，为防盗链资源识别与下载兜底打基础（参考猫抓 onSendHeaders 关联请求头的做法）
+- 从 `content-disposition` 响应头解析附件文件名，修复"URL 无文件名"时的资源命名边界场景
+
+🔧 优化
+- 资源去重归一化：`normalizeUrl` 增加 Range/分片参数（bytestart/byterange/range/seg 等）截断，让同一资源的分片/带缓存串请求收敛成一条，减少重复（参考猫抓对 bytestart 分片的归一化思路）
+- 多 Tab 状态管理：`webNavigation.onCommitted` 主框架导航即清理该 tab 数据（解决页面刷新/跳转后数据残留错乱），启动时 `tabs.query` 快照回收已关闭 tab 的孤儿数据（参考猫抓 clearRedundant 思想）
+- 默认模式过滤强化：显式过滤 `.svg` / `.ico` 矢量图标、tracking/beacon/1x1 像素图等噪音资源
+- `webRequest` 增加 `onErrorOccurred` 清理 Referer 暂存，防内存泄漏
+
+🐛 修复
+- `resourceType` 兜底：URL 无媒体扩展名、MIME 不明确但浏览器判定为 media/video/audio 的资源，此前漏抓，现正确归类（参考猫抓"后缀 → MIME → 附件名 + resourceType 兜底"四路判定）
+
+## v0.2.1 2026-09-08
+
+🐛 修复：防盗链CDN资源弹窗预览播放失败问题，跳过预览播放器，保留下载/打开功能
+🐛 修复：顶部刷新按钮失效，点击可清空列表并重新扫描页面媒体
+✨ 新增：抓取模式切换【默认模式 / 深度搜索模式】，默认模式过滤头像、ico、svg等垃圾小资源
+📝 更新README：移除猫抓相关外部文档链接，补充完整免责声明
 
 ## v0.2.0
 

@@ -291,8 +291,33 @@ function closePreview() {
   previewResource = null;
 }
 
+// ---------- 防盗链/分片预览跳过判断 ----------
+// MV3 安全约束：扩展不能通过 <video>/<audio> 注入 Referer 头，
+// 因此对已知防盗链 CDN 或 DASH/HLS 分片资源跳过播放器，改为提示卡。
+const PREVIEW_SKIP_HOST_RE = /(^|\.)(bilivideo\.com|hdslb\.com|googlevideo\.com|ytimg\.com)$/i;
+const PREVIEW_SKIP_EXT_RE = /\.(m4s|m3u8|mpd|ts)(\?|#|$)/i;
+const PREVIEW_MIN_VIDEO_SIZE = 2 * 1024 * 1024; // 2MB，小于视为分片
+
+function shouldSkipVideoPreview(r) {
+  if (!r) return false;
+  const url = (r.url || '').toLowerCase();
+  // 1) 已知防盗链 CDN 主机
+  try {
+    if (PREVIEW_SKIP_HOST_RE.test(new URL(url).hostname)) return true;
+  } catch { /* ignore */ }
+  // 2) DASH/HLS 分片后缀
+  if (PREVIEW_SKIP_EXT_RE.test(url)) return true;
+  // 3) type='video' 且体积过小（很可能为分片而非完整视频）
+  if (r.type === 'video' && r.size != null && r.size > 0 && r.size < PREVIEW_MIN_VIDEO_SIZE) return true;
+  return false;
+}
+
 function buildPreviewMedia(r) {
   const url = escapeHtml(r.url);
+  // 防盗链/分片资源：不渲染播放器，展示提示卡（元信息与操作按钮保留）
+  if ((r.type === 'video' || r.type === 'audio') && shouldSkipVideoPreview(r)) {
+    return `<div class="preview-media skip">⚠ 预览跳过（可能需要 Referer 或该资源是分片）<br>请点「打开」在新标签页播放，或「下载」保存</div>`;
+  }
   if (r.type === 'video') {
     return `<video class="preview-media" controls autoplay preload="auto" src="${url}"></video>`;
   }
@@ -466,24 +491,61 @@ function renderParseResult(el, parsed, isMpd) {
 
 // ---------- 数据读取 ----------
 function refresh() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0]) return;
-    currentTabId = tabs[0].id;
-    currentTabUrl = tabs[0].url || '';
-    chrome.runtime.sendMessage({ action: 'getResources', tabId: currentTabId }, (resp) => {
-      if (chrome.runtime.lastError) {
-        allResources = [];
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) { resolve(); return; }
+      currentTabId = tabs[0].id;
+      currentTabUrl = tabs[0].url || '';
+      chrome.runtime.sendMessage({ action: 'getResources', tabId: currentTabId }, (resp) => {
+        if (chrome.runtime.lastError) {
+          allResources = [];
+          render();
+          resolve();
+          return;
+        }
+        allResources = (resp && resp.resources) || [];
+        if (previewOpen && previewResource) {
+          const stillThere = allResources.find((r) => r.url === previewResource.url);
+          if (!stillThere) closePreview();
+        }
         render();
-        return;
-      }
-      allResources = (resp && resp.resources) || [];
-      if (previewOpen && previewResource) {
-        const stillThere = allResources.find((r) => r.url === previewResource.url);
-        if (!stillThere) closePreview();
-      }
-      render();
+        resolve();
+      });
     });
   });
+}
+
+// ---------- 抓取模式 UI ----------
+function applyCaptureMode(mode) {
+  const m = mode === 'deep' ? 'deep' : 'default';
+  document.querySelectorAll('input[name="captureMode"]').forEach((r) => {
+    r.checked = (r.value === m);
+  });
+}
+
+function loadCaptureMode() {
+  chrome.storage.local.get('captureMode', (result) => {
+    if (chrome.runtime.lastError) { applyCaptureMode('default'); return; }
+    applyCaptureMode(result && result.captureMode === 'deep' ? 'deep' : 'default');
+  });
+}
+
+// 清空当前 tab 资源 → 通知 content 重扫 → 重新拉取列表
+async function doFullRefresh() {
+  const btn = document.getElementById('refresh');
+  if (btn) { btn.disabled = true; btn.textContent = '刷新中…'; }
+  try {
+    await chrome.runtime.sendMessage({ action: 'clearResources', tabId: currentTabId });
+    if (currentTabId) {
+      try { await chrome.tabs.sendMessage(currentTabId, { action: 'rescan' }); }
+      catch (e) { /* content 未注入时静默 */ }
+    }
+    // 等待 content script 的 addDomResources 异步重报落地，减少列表短暂为空
+    await new Promise((r) => setTimeout(r, 300));
+    await refresh();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '刷新'; }
+  }
 }
 
 // ---------- 事件绑定 ----------
@@ -503,7 +565,25 @@ document.getElementById('sortOrder').addEventListener('change', (e) => {
   render();
 });
 
-document.getElementById('refresh').addEventListener('click', refresh);
+document.getElementById('refresh').addEventListener('click', doFullRefresh);
+
+// 抓取模式切换
+document.querySelectorAll('input[name="captureMode"]').forEach((radio) => {
+  radio.addEventListener('change', async () => {
+    if (!radio.checked) return;
+    const mode = radio.value;
+    applyCaptureMode(mode);
+    // 同步到后台（含 storage 持久化）
+    await chrome.runtime.sendMessage({ action: 'setMode', mode });
+    // 同步到当前 tab 的 content script（避免重扫时仍用旧模式）
+    if (currentTabId) {
+      try { await chrome.tabs.sendMessage(currentTabId, { action: 'setMode', mode }); }
+      catch (e) { /* content 未注入时静默 */ }
+    }
+    // 切换后自动刷新：清空 + 重扫 + 重新拉取
+    await doFullRefresh();
+  });
+});
 document.getElementById('clear').addEventListener('click', () => {
   closePreview();
   chrome.runtime.sendMessage({ action: 'clearResources', tabId: currentTabId }, () => refresh());
@@ -523,4 +603,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && previewOpen) closePreview();
 });
 
+loadCaptureMode();
 refresh();
+
+// ---------- SW 长连接保活 ----------
+// popup 打开期间保持后台 SW 活跃，避免长时间操作时 SW 被回收（参考猫抓 HeartBeat 思想）
+try {
+  const hbPort = chrome.runtime.connect({ name: 'media-heartbeat' });
+  window.addEventListener('unload', () => { try { hbPort.disconnect(); } catch (e) { /* ignore */ } });
+} catch (e) { /* ignore */ }

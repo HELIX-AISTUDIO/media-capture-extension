@@ -19,12 +19,15 @@
 
 const reported = new Set(); // 本次页面生命周期内已上报 URL 去重
 
+// 抓取模式：'default' 过滤垃圾 / 'deep' 全部抓取（由 popup 经后台同步）
+let captureMode = 'default';
+
 // 图片尺寸阈值
 const MIN_IMG_EDGE = 120;
 const MIN_IMG_AREA = 120 * 120;
 
 // 图片垃圾关键词
-const IMG_JUNK_RE = /(logo|icon|avatar|sprite|emoji|favicon|loading|placeholder|spinner|dot|badge|pixel|blank|transparent|arrow|btn|button|qrcode|qr_code|thum?b|tiny|small|mini|ad[-_]|banner|promo|slide|carousel|watermark|share[-_]|header|footer|nav-|sprite|cover-?img|sm[-_.]|xs[-_.]|bg[-_.]|^_|@!|_\d+_\d+\.|\d{2,4}x\d{2,4})/i;
+const IMG_JUNK_RE = /(logo|icon|avatar|sprite|emoji|favicon|loading|placeholder|spinner|dot|badge|pixel|blank|transparent|tracking|beacon|spacer|1x1|arrow|btn|button|qrcode|qr_code|thum?b|tiny|small|mini|ad[-_]|banner|promo|slide|carousel|watermark|share[-_]|header|footer|nav-|sprite|cover-?img|sm[-_.]|xs[-_.]|bg[-_.]|^_|@!|_\d+_\d+\.|\d{2,4}x\d{2,4})/i;
 
 // 平台图片黑名单（抖音/YouTube 不抓图片）
 const IMG_HOST_BLOCKLIST = /(\.ytimg\.com|googlevideo\.com|douyinpic\.com|byteeffect|byteicdn|byteimg|byteimgcn|mmstat|alipay|aliimg|bdimg|baidu\.com\/img|doubleclick|googlesyndication|gstatic\.com\/ads)/i;
@@ -46,6 +49,8 @@ function isMeaningfulImage(img) {
   if (w < MIN_IMG_EDGE && h < MIN_IMG_EDGE) return false;
   if (w * h < MIN_IMG_AREA) return false;
   const src = img.currentSrc || img.src || '';
+  // 显式过滤矢量图标/网站图标文件（svg/ico 基本不是"主要内容图"）
+  if (/\.(svg|ico)(\?|#|$)/i.test(src)) return false;
   if (IMG_JUNK_RE.test(src)) return false;
   try {
     const hostname = new URL(src).hostname;
@@ -117,11 +122,22 @@ function scanMedia() {
 }
 
 // ---------- 扫描图片 ----------
-function scanImages() {
+// mode 缺省时使用当前 captureMode；deep 模式不过滤，全部抓取
+function scanImages(mode) {
+  const m = mode || captureMode;
   const out = [];
   document.querySelectorAll('img').forEach((img) => {
-    if (!isMeaningfulImage(img)) return;
     const src = img.currentSrc || img.src;
+    if (!src || !isHttpUrl(src)) return;
+    if (m === 'deep') {
+      // 深度搜索模式：不过滤尺寸/关键词/平台黑名单，全部抓取
+      out.push({
+        url: src, size: null, source: 'dom',
+        width: img.naturalWidth || null, height: img.naturalHeight || null
+      });
+      return;
+    }
+    if (!isMeaningfulImage(img)) return;
     out.push({
       url: src, size: null, source: 'dom',
       width: img.naturalWidth, height: img.naturalHeight
@@ -256,3 +272,26 @@ window.addEventListener('load', () => {
 if (document.readyState === 'complete') {
   setTimeout(deepSearch, 2000);
 }
+
+// ---------- 抓取模式同步与重扫 ----------
+// 启动时向后台读取当前模式
+chrome.runtime.sendMessage({ action: 'getMode' }, (resp) => {
+  if (chrome.runtime.lastError) return;
+  if (resp && resp.ok) captureMode = resp.mode === 'deep' ? 'deep' : 'default';
+});
+
+// 监听后台/弹窗下发的模式切换与重扫指令
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || !msg.action) return;
+  if (msg.action === 'setMode') {
+    captureMode = msg.mode === 'deep' ? 'deep' : 'default';
+    return;
+  }
+  if (msg.action === 'rescan') {
+    // 清空去重集合，允许已上报资源被重新上报
+    reported.clear();
+    // 立即重扫媒体与图片（缓存捕捉由常规轮询兜底）
+    reportResources(scanMedia().concat(scanImages()));
+    return;
+  }
+});

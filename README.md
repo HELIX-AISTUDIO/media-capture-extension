@@ -1,12 +1,9 @@
 # 网页媒体抓取器（Media Catch）— Edge 扩展
 
-一个适配 **Microsoft Edge** 的 **Manifest V3** 浏览器扩展，参考开源项目
-[猫抓 cat-catch](https://github.com/xifangczy/cat-catch) 的成熟架构**重新工程化实现**：
+一个适配 **Microsoft Edge** 的 **Manifest V3** 浏览器扩展：
 网络抓包 + DOM 深度搜索 + 缓存捕捉三合一，自动识别并抓取页面中的
 **视频 / 图片 / 音频 / 流媒体**（m3u8、mpd、mp4、webm、jpg、png、gif 等），
 在弹窗中展示列表，支持筛选、排序、预览、复制、下载、批量复制，以及 m3u8 / DASH 解析。
-
-> 本项目为**重新实现**，只借鉴架构与多年迭代踩坑经验，未复制猫抓完整源码。
 
 ---
 
@@ -15,7 +12,9 @@
 - **双捕获体系 + 缓存捕捉**：非阻塞 `webRequest` 网络抓包 + DOM 深度搜索 + `performance` 缓存捕捉，减少漏抓。
 - **完整解析体系**：普通资源直列；M3U8 解析器（嵌套多码率 / 分片去重 / 密钥识别）；DASH/MPD 解析器（音视轨分类 / 分片提取）。
 - **弹窗界面**：类型 / 关键词 / 大小区间表达式筛选，排序，批量复制，预览大窗口（视频直接播放）。
-- **持久化**：`chrome.storage.session` 存储，解决 Service Worker 休眠丢数据。
+- **抓取模式**：默认模式（过滤头像 / 图标 / svg / ico 等噪音）与深度搜索模式（全量抓取）一键切换。
+- **SW 生命周期健壮性**：`storage.session` 持久化 + `alarms` 定时唤醒 + `webNavigation` 导航唤醒 + `onConnect` 长连接保活，解决 Service Worker 休眠导致抓取中断。
+- **多 Tab 状态管理**：按 tab 分桶存储，导航刷新自动清理，关闭 tab 自动回收，避免数据残留错乱。
 
 ---
 
@@ -49,6 +48,8 @@
 | `webRequest` | 非阻塞观察网络请求（MV3 下唯一合规的「收集资源列表」路径） |
 | `downloads` | 触发浏览器下载 |
 | `storage` | `chrome.storage.session` 持久化资源列表 |
+| `alarms` | 定时唤醒 SW，重新注册监听器 + 回收孤儿数据 |
+| `webNavigation` | 导航事件唤醒 SW + 主框架导航时清理对应 tab 数据 |
 | `host_permissions: <all_urls>` | 让 webRequest 观察到 CDN 等第三方域名媒体 |
 
 ---
@@ -78,27 +79,9 @@ edge_media_catch_ext/
 
 ---
 
-## 文档链接
+## 下一版本迭代清单
 
-- 猫抓官方文档：<https://cat-catch.94cat.com/docs/install>
-- 猫抓源码仓库：<https://github.com/xifangczy/cat-catch>
-- 猫抓更新日志（本项目的 CHANGELOG 格式参考）：<https://github.com/xifangczy/cat-catch/blob/master/CHANGELOG.md>
-- 本项目更新日志：[CHANGELOG.md](./CHANGELOG.md)
 
----
-
-## 与猫抓对比 + 下一版本迭代清单
-
-| 能力 | 猫抓 | 本扩展 |
-| --- | --- | --- |
-| 网络拦截 | webRequest + DevTools + debugger | 非阻塞 webRequest |
-| 深度搜索 | 完整（密钥/一次性URL/playlist） | 精简版（script 文本扫描） |
-| 缓存捕捉 | 完整（从头捕获） | performance 资源时间线 |
-| m3u8/mpd 解析 | 完整 + 合并下载 | 解析分片（不合并） |
-| 自定义规则 / DevTools | 支持 | 未实现 |
-| SW 持久化 | storage.session | storage.session ✅ |
-
-**下一版本迭代清单**：
 1. 接入 `m3u8dl://` 自定义协议，唤起本地下载工具（N_m3u8DL-CLI）。
 2. 在线 ffmpeg 分片合并（可选后端）。
 3. DevTools 面板深度捕获。
@@ -106,3 +89,13 @@ edge_media_catch_ext/
 5. 请求头透传（Referer/Cookie）以解决更多防盗链。
 6. 资源导出 JSON/CSV。
 7. 深色模式。
+
+---
+
+## 免责声明
+
+本项目仅为个人学习开发，仅供个人本地研究使用，禁止用于任何商业用途。
+
+仅用于抓取本人拥有合法版权授权的媒体资源，使用本扩展产生的一切法律责任由使用者自行承担。
+
+请勿用于下载、复制未授权的版权内容，请尊重著作权。

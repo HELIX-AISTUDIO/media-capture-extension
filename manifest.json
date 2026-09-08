@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "网页媒体抓取器 (Media Catch)",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "抓取当前网页中的视频/图片/音频资源(m3u8/mp4/webm/mpd/jpg/png/gif 等),支持 m3u8/DASH 解析、预览、筛选、批量复制与下载。参考猫抓 cat-catch 架构重新工程化实现。",
 
   "minimum_chrome_version": "104",
@@ -9,7 +9,9 @@
   "permissions": [
     "webRequest",
     "downloads",
-    "storage"
+    "storage",
+    "alarms",
+    "webNavigation"
   ],
 
   "host_permissions": [

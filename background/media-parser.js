@@ -36,7 +36,7 @@ const IMG_HOST_BLOCKLIST = /(\.ytimg\.com$|googlevideo\.com|douyinpic\.com|bytee
 const VIDEO_FRAGMENT_HOST = /(byteeffect|byteicdn|byteeffecttos|douyinpic|api\.douyin|douyin\.com\/aweme\/v1)/i;
 
 // ---------- 图片垃圾关键词：URL 命中即跳过 ----------
-const IMG_JUNK_RE = /(logo|icon|avatar|sprite|emoji|favicon|loading|placeholder|spinner|dot|badge|pixel|blank|transparent|arrow|btn|button|qrcode|qr_code|thum?b|tiny|small|mini|ad[-_]|banner|promo|slide|carousel|watermark|share[-_]|cover-?img|nav-|@!|_\d+_\d+\.|\d{2,4}x\d{2,4})/i;
+const IMG_JUNK_RE = /(logo|icon|avatar|sprite|emoji|favicon|loading|placeholder|spinner|dot|badge|pixel|blank|transparent|tracking|beacon|spacer|1x1|arrow|btn|button|qrcode|qr_code|thum?b|tiny|small|mini|ad[-_]|banner|promo|slide|carousel|watermark|share[-_]|cover-?img|nav-|@!|_\d+_\d+\.|\d{2,4}x\d{2,4})/i;
 
 // ---------- 体积阈值 ----------
 const MIN_VIDEO_SIZE = 300 * 1024;      // 300KB，小于视为水印/预览片段
@@ -123,6 +123,7 @@ function safeFilename(name) {
 
 /**
  * URL 规范化去重：去掉无意义参数（如时间戳、签名变化但主体相同），
+ * 以及 DASH/分片 Range 参数（bytestart/byterange 等，让同一资源的分片收敛成一条）。
  * 用于判断"重复资源"。保留 hash 与关键 query。
  */
 function normalizeUrl(url) {
@@ -133,10 +134,35 @@ function normalizeUrl(url) {
     for (const k of drop) {
       if (u.searchParams.has(k)) u.searchParams.delete(k);
     }
+    // 去掉 Range/分片参数（参考猫抓对 bytestart 分片的归一化处理）
+    const fragDrop = ['bytestart', 'byterange', 'range', 'start', 'end', 'seg', 'segment', 'part'];
+    for (const k of fragDrop) {
+      if (u.searchParams.has(k)) u.searchParams.delete(k);
+    }
     return u.toString();
   } catch {
     return url;
   }
+}
+
+/**
+ * 从 content-disposition 响应头解析附件文件名。
+ * 修复"URL 无文件名 + 服务端通过 attachment 头下发文件名"的边界场景。
+ */
+function parseContentDisposition(headers) {
+  if (!headers) return null;
+  for (const h of headers) {
+    if (h.name && h.name.toLowerCase() === 'content-disposition') {
+      const v = h.value || '';
+      // 优先 RFC 5987：filename*=UTF-8''xxx
+      let m = /filename\*=UTF-8''([^;]+)/i.exec(v);
+      if (m) { try { return decodeURIComponent(m[1]); } catch { return m[1]; } }
+      // 回退 filename="xxx"
+      m = /filename="?([^";]+)"?/i.exec(v);
+      if (m && m[1]) return m[1];
+    }
+  }
+  return null;
 }
 
 /**
@@ -162,6 +188,8 @@ function classify(url, mime) {
 // 网络层图片垃圾过滤
 function isJunkImage(url, size) {
   const lower = (url || '').toLowerCase();
+  // 显式过滤矢量图标/网站图标文件（svg/ico 基本不是"主要内容图"）
+  if (/\.(svg|ico)(\?|#|$)/i.test(lower)) return true;
   if (IMG_JUNK_RE.test(lower)) return true;
   if (IMG_HOST_BLOCKLIST.test(lower)) return true;
   if (size != null && size > 0 && size < MIN_IMAGE_SIZE) return true;

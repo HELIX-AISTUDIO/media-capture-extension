@@ -4,7 +4,8 @@
  * 后台 Service Worker（Manifest V3）
  * ------------------------------------------------------------
  * 功能：
- *   1. chrome.webRequest 非阻塞观察网络请求（onBeforeRequest + onCompleted）
+ *   1. chrome.webRequest 非阻塞观察网络请求
+ *      （onBeforeRequest + onSendHeaders + onCompleted + onErrorOccurred）
  *   2. 资源数据持久化到 chrome.storage.session（解决 SW 休眠丢数据）
  *   3. 严格媒体过滤：追踪/日志接口、垃圾图片、水印片段
  *   4. 按 DASH 音/视轨关键字正确分类；按 size 推测 B 站 m4s 音频流
@@ -17,12 +18,18 @@
  *     逻辑"，因此"收集资源列表"场景必须用 webRequest，这是 MV3 下
  *     唯一合规路径（详见 references/principles.md）。
  *   - storage.session 跨 SW 休眠存活（浏览器会话期间），解决数据丢失。
+ *
+ * SW 生命周期健壮性（参考猫抓对抗 MV3 休眠的策略，独立实现）：
+ *   a. 接受 SW 必死：关键数据落 storage.session，唤醒后 restoreFromStorage 自愈；
+ *   b. chrome.alarms 定时唤醒（重注册监听器 + 孤儿 tab 回收）；
+ *   c. webNavigation 空监听作为导航事件唤醒源；
+ *   d. onConnect 长连接在 popup 打开期间保持 SW 活跃。
  * ============================================================
  */
 
 importScripts('media-parser.js', 'm3u8-parser.js', 'mpd-parser.js');
 
-// 内存存储：tabId -> Map<url, resource>
+// 内存存储：tabId -> Map<normalizedUrl, resource>
 // 同时镜像到 chrome.storage.session，SW 休眠重启后可从 storage 恢复。
 const store = new Map();
 
@@ -32,8 +39,15 @@ const STORE_KEY_PREFIX = 'mediaStore::';
 // 是否已完成从 storage.session 的初始化恢复
 let restored = false;
 
+// 抓取模式：'default'（过滤垃圾资源） / 'deep'（全部抓取）
+// 由 popup 通过 setMode 消息更新，并持久化到 chrome.storage.local。
+let currentCaptureMode = 'default';
+
 // 写存储的节流（debounce），避免高频 IO
 const persistTimers = new Map();
+
+// requestId -> referer（onSendHeaders 暂存，onCompleted 消费后删除）
+const requestReferer = new Map();
 
 // ---------- storage.session 持久化 ----------
 function schedulePersist(tabId) {
@@ -71,9 +85,65 @@ function restoreFromStorage() {
       for (const url of Object.keys(obj)) map.set(url, obj[url]);
       store.set(tabId, map);
     }
+    // 恢复后回收孤儿 tab（已关闭的 tab 残留数据）
+    sweepOrphanTabs();
   });
 }
 restoreFromStorage();
+
+// 启动时读取上次保存的抓取模式
+chrome.storage.local.get('captureMode', (result) => {
+  if (chrome.runtime.lastError) return;
+  const v = result && result.captureMode;
+  if (v === 'deep' || v === 'default') currentCaptureMode = v;
+});
+
+// ---------- SW 生命周期：alarms 定时唤醒 ----------
+// 参考猫抓用 alarms 定时调度的思想，这里用作 SW 心跳：
+// alarm 触发本身会唤醒 SW，从而重新注册 webRequest 监听器，
+// 并顺便回收孤儿 tab。periodInMinutes 5 分钟权衡了唤醒频率与开销。
+chrome.alarms.create('media-heartbeat', { periodInMinutes: 5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'media-heartbeat') sweepOrphanTabs();
+});
+
+// ---------- SW 生命周期：webNavigation 作为唤醒源 + 导航清理 ----------
+// onBeforeNavigate / onCommitted 本身就是 MV3 的 SW 唤醒事件。
+// 主框架（frameId === 0）导航提交时清空该 tab 的抓取数据，
+// 解决"页面刷新 / 跳转后数据残留错乱"问题（参考猫抓 autoClear 思想）。
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId === 0) clearTabData(details.tabId);
+});
+
+// ---------- SW 生命周期：onConnect 长连接保活 ----------
+// popup 打开期间保持 SW 活跃，避免长驻弹窗时 SW 被回收。
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'media-heartbeat') return;
+  const keepAlive = setInterval(() => {
+    try { port.postMessage({ type: 'ping' }); }
+    catch (e) { clearInterval(keepAlive); }
+  }, 20000);
+  port.onDisconnect.addListener(() => clearInterval(keepAlive));
+});
+
+// ---------- 孤儿 tab 回收 ----------
+// 用 tabs.query 快照删除已关闭 tab 的残留数据（参考猫抓 clearRedundant 思想）
+function sweepOrphanTabs() {
+  chrome.tabs.query({}, (tabs) => {
+    if (chrome.runtime.lastError) return;
+    const alive = new Set((tabs || []).map((t) => t.id).filter((id) => id != null));
+    for (const tabId of Array.from(store.keys())) {
+      if (!alive.has(tabId)) clearTabData(tabId);
+    }
+  });
+}
+
+function clearTabData(tabId) {
+  if (tabId == null || tabId < 0) return;
+  store.delete(tabId);
+  chrome.storage.session.remove(STORE_KEY_PREFIX + tabId, () => void chrome.runtime.lastError);
+  chrome.action.setBadgeText({ tabId, text: '' }, () => void chrome.runtime.lastError);
+}
 
 // ---------- 存储资源 ----------
 function storeResource(tabId, resource) {
@@ -84,7 +154,10 @@ function storeResource(tabId, resource) {
   // 限制每 tab 资源数，防止内存泄漏/CPU 占用（参考猫抓 2.5.9）
   if (map.size >= MAX_RESOURCES_PER_TAB) return;
 
-  const existing = map.get(resource.url);
+  // 归一化 key：去掉缓存/分片参数，让同一资源的不同分片/带缓存串的
+  // 请求收敛成一条（参考猫抓对 bytestart 分片的归一化思路）。
+  const key = normalizeUrl(resource.url);
+  const existing = map.get(key);
   if (existing) {
     // 合并：DOM 来源优先；取更大 size；补全缺失字段
     if (existing.source === 'network' && resource.source !== 'network') {
@@ -94,13 +167,14 @@ function storeResource(tabId, resource) {
       existing.size = resource.size;
     }
     if (!existing.mime && resource.mime) existing.mime = resource.mime;
+    if (!existing.referer && resource.referer) existing.referer = resource.referer;
     if (resource.width && !existing.width) existing.width = resource.width;
     if (resource.height && !existing.height) existing.height = resource.height;
     if (resource.posterUrl && !existing.posterUrl) existing.posterUrl = resource.posterUrl;
     // 时间戳取最新
     if (resource.ts && (!existing.ts || resource.ts > existing.ts)) existing.ts = resource.ts;
   } else {
-    map.set(resource.url, resource);
+    map.set(key, resource);
   }
   updateBadge(tabId);
   schedulePersist(tabId);
@@ -117,51 +191,63 @@ function updateBadge(tabId) {
 }
 
 // ---------- 响应头解析 ----------
-function getContentRangeTotal(headers) {
+function getHeaderValue(headers, name) {
   if (!headers) return null;
   for (const h of headers) {
-    if (h.name && h.name.toLowerCase() === 'content-range') {
-      const m = /bytes\s+\d+-\d+\/(\d+)/i.exec(h.value || '');
-      if (m && m[1]) {
-        const n = parseInt(m[1], 10);
-        return isNaN(n) ? null : n;
-      }
-    }
+    if (h.name && h.name.toLowerCase() === name.toLowerCase()) return h.value || null;
+  }
+  return null;
+}
+
+function getContentRangeTotal(headers) {
+  const v = getHeaderValue(headers, 'content-range');
+  if (!v) return null;
+  const m = /bytes\s+\d+-\d+\/(\d+)/i.exec(v);
+  if (m && m[1]) {
+    const n = parseInt(m[1], 10);
+    return isNaN(n) ? null : n;
   }
   return null;
 }
 
 function getContentLength(headers) {
-  if (!headers) return null;
   const rangeTotal = getContentRangeTotal(headers);
   if (rangeTotal != null) return rangeTotal;
-  for (const h of headers) {
-    if (h.name && h.name.toLowerCase() === 'content-length') {
-      const n = parseInt(h.value, 10);
-      return isNaN(n) ? null : n;
-    }
+  const v = getHeaderValue(headers, 'content-length');
+  if (v) {
+    const n = parseInt(v, 10);
+    return isNaN(n) ? null : n;
   }
   return null;
 }
 
 function getContentType(headers) {
-  if (!headers) return null;
-  for (const h of headers) {
-    if (h.name && h.name.toLowerCase() === 'content-type') {
-      return (h.value || '').split(';')[0].trim();
-    }
-  }
-  return null;
+  const v = getHeaderValue(headers, 'content-type');
+  return v ? v.split(';')[0].trim() : null;
+}
+
+// ---------- 网络层图片接受判断（按抓取模式集中控制） ----------
+// default 模式：过滤垃圾图片（关键词/平台黑名单/尺寸阈值/svg/ico）
+// deep 模式：不过滤，全部接受（仍保留 isTrackingUrl 追踪过滤）
+function shouldAcceptNetworkImage(url, size, mode) {
+  if (mode === 'deep') return true;
+  return !isJunkImage(url, size);
 }
 
 // ---------- 监听请求开始 ----------
 chrome.webRequest.onBeforeRequest.addListener((details) => {
   const { tabId, url } = details;
+  if (tabId < 0) return; // 后台请求无归属 tab，忽略
   if (isTrackingUrl(url)) return;
   if (isMediaUrl(url)) {
+    const type = classify(url, null);
+    // 图片统一放到 onCompleted 处理：等拿到 size 后由
+    // shouldAcceptNetworkImage 决定是否存储（default 模式过滤垃圾图）。
+    // 否则 onBeforeRequest 无条件存储会让 default 模式漏出小 logo/icon。
+    if (type === 'image') return;
     storeResource(tabId, {
       url,
-      type: classify(url, null),
+      type,
       mime: null,
       size: null,
       filename: filenameFromUrl(url),
@@ -171,45 +257,72 @@ chrome.webRequest.onBeforeRequest.addListener((details) => {
   }
 }, { urls: ['<all_urls>'] });
 
+// ---------- 监听请求头：暂存 referer（用于防盗链识别） ----------
+chrome.webRequest.onSendHeaders.addListener((details) => {
+  if (details.tabId < 0) return;
+  const referer = getHeaderValue(details.requestHeaders, 'referer');
+  if (referer) requestReferer.set(details.requestId, referer);
+}, { urls: ['<all_urls>'] }, ['requestHeaders', 'extraHeaders']);
+
 // ---------- 监听响应完成：补全 MIME/大小 + 过滤垃圾 ----------
 chrome.webRequest.onCompleted.addListener((details) => {
-  const { tabId, url, responseHeaders } = details;
+  const { tabId, url, responseHeaders, type: resourceType } = details;
+  if (tabId < 0) return;
   if (isTrackingUrl(url)) return;
+
+  // 消费 referer（用完即删，防内存泄漏）
+  const referer = requestReferer.get(details.requestId);
+  requestReferer.delete(details.requestId);
+
   const mime = getContentType(responseHeaders);
   const size = getContentLength(responseHeaders);
-  const type = classify(url, mime);
+  let type = classify(url, mime);
+
+  // resourceType 兜底：webRequest 判定为 media/video/audio 的资源，
+  // 即使 URL 无媒体扩展名、mime 也不明确，也视为媒体（参考猫抓三路判定）
+  if (type === 'media' && (resourceType === 'media' || resourceType === 'video' || resourceType === 'audio')) {
+    type = resourceType === 'audio' ? 'audio' : 'video';
+  }
 
   // 过滤 .flv 直播流（RTMP-flv 不可下载）
   if (/\.flv(\?|#|$)/i.test(url)) return;
 
-  // 图片垃圾过滤
-  if (type === 'image' && isJunkImage(url, size)) return;
+  // 图片垃圾过滤（deep 模式完全跳过）
+  if (type === 'image' && !shouldAcceptNetworkImage(url, size, currentCaptureMode)) return;
 
-  // 视频：过滤过小片段与水印域
-  if (type === 'video') {
-    if (size != null && size < MIN_VIDEO_SIZE) return;
-    if (VIDEO_FRAGMENT_HOST.test(url)) return;
+  // 视频/音频片段过滤（deep 模式完全跳过）
+  if (currentCaptureMode === 'default') {
+    if (type === 'video') {
+      if (size != null && size < MIN_VIDEO_SIZE) return;
+      if (VIDEO_FRAGMENT_HOST.test(url)) return;
+    }
+    if (type === 'audio' && size != null && size < MIN_AUDIO_SIZE) return;
   }
-  // 音频：过滤过小片段
-  if (type === 'audio' && size != null && size < MIN_AUDIO_SIZE) return;
 
-  if (isMediaUrl(url) || isMediaMime(mime)) {
+  if (isMediaUrl(url) || isMediaMime(mime) || resourceType === 'media' || resourceType === 'video' || resourceType === 'audio') {
+    // content-disposition 附件名优先（修复 URL 无文件名场景）
+    const cdName = parseContentDisposition(responseHeaders);
     storeResource(tabId, {
       url,
       type,
       mime,
       size,
-      filename: filenameFromUrl(url),
+      filename: cdName || filenameFromUrl(url),
       source: 'network',
+      referer: referer || null,
       ts: Date.now()
     });
   }
 }, { urls: ['<all_urls>'] }, ['responseHeaders']);
 
+// ---------- 监听请求失败：清理 referer 暂存 ----------
+chrome.webRequest.onErrorOccurred.addListener((details) => {
+  requestReferer.delete(details.requestId);
+});
+
 // ---------- 标签页关闭时清理 ----------
 chrome.tabs.onRemoved.addListener((tabId) => {
-  store.delete(tabId);
-  chrome.storage.session.remove(STORE_KEY_PREFIX + tabId, () => void chrome.runtime.lastError);
+  clearTabData(tabId);
 });
 
 // ---------- 消息路由 ----------
@@ -235,9 +348,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     case 'clearResources': {
       const tabId = msg.tabId ?? sender.tab?.id;
-      store.delete(tabId);
-      chrome.storage.session.remove(STORE_KEY_PREFIX + tabId, () => void chrome.runtime.lastError);
-      if (tabId >= 0) chrome.action.setBadgeText({ tabId, text: '' }, () => void chrome.runtime.lastError);
+      clearTabData(tabId);
+      sendResponse({ ok: true });
+      break;
+    }
+
+    case 'setMode': {
+      const mode = msg.mode === 'deep' ? 'deep' : 'default';
+      currentCaptureMode = mode;
+      chrome.storage.local.set({ captureMode: mode }, () => {
+        // 同步到所有已注入的 content script
+        chrome.tabs.query({}, (tabs) => {
+          for (const t of tabs) {
+            if (t.id != null) {
+              chrome.tabs.sendMessage(t.id, { action: 'setMode', mode }, () => void chrome.runtime.lastError);
+            }
+          }
+        });
+        sendResponse({ ok: true, mode });
+      });
+      return true; // 异步
+    }
+
+    case 'getMode': {
+      // 直接从 storage 读取，避免 SW 冷启动时缓存尚未就绪的竞态
+      chrome.storage.local.get('captureMode', (result) => {
+        const v = result && result.captureMode;
+        const mode = (v === 'deep' || v === 'default') ? v : currentCaptureMode;
+        currentCaptureMode = mode;
+        sendResponse({ ok: true, mode });
+      });
+      return true; // 异步
+    }
+
+    case 'rescan': {
+      const tabId = msg.tabId ?? sender.tab?.id;
+      if (tabId != null && tabId >= 0) {
+        chrome.tabs.sendMessage(tabId, { action: 'rescan' }, () => void chrome.runtime.lastError);
+      }
       sendResponse({ ok: true });
       break;
     }
@@ -264,16 +412,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const tabId = msg.tabId ?? sender.tab?.id;
       (msg.items || []).forEach((it) => {
         if (!it || !it.url) return;
-        // DOM 图片尺寸过滤
-        if (it.width != null && it.height != null) {
-          if (it.width < 120 && it.height < 120) return;
-        }
-        // DOM 图片平台黑名单
-        if (it.width != null || /\.(png|jpe?g|gif|webp|bmp|avif)/i.test(it.url)) {
-          try {
-            const host = new URL(it.url).hostname;
-            if (IMG_HOST_BLOCKLIST.test(host)) return;
-          } catch { /* ignore */ }
+        // DOM 图片过滤仅在默认模式启用（deep 模式全部接受）
+        if (currentCaptureMode === 'default') {
+          // DOM 图片尺寸过滤
+          if (it.width != null && it.height != null) {
+            if (it.width < 120 && it.height < 120) return;
+          }
+          // DOM 图片平台黑名单
+          if (it.width != null || /\.(png|jpe?g|gif|webp|bmp|avif)/i.test(it.url)) {
+            try {
+              const host = new URL(it.url).hostname;
+              if (IMG_HOST_BLOCKLIST.test(host)) return;
+            } catch { /* ignore */ }
+          }
         }
         storeResource(tabId, {
           url: it.url,
@@ -285,6 +436,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           width: it.width || null,
           height: it.height || null,
           posterUrl: it.posterUrl || null,
+          referer: it.referer || null,
           ts: it.ts || Date.now()
         });
       });
@@ -308,7 +460,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ---------- m3u8 解析处理 ----------
 function handleParseM3u8(msg, sendResponse) {
   const url = msg.url;
-  const pageUrl = msg.pageUrl || '';
   fetch(url, {
     credentials: 'include',
     referrerPolicy: 'no-referrer-when-downgrade',

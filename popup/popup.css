@@ -126,6 +126,39 @@ h1 {
   cursor: pointer;
 }
 
+/* ---------- 抓取模式切换 ---------- */
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-top: 8px;
+}
+
+.mode-label {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.mode-option input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
 /* ---------- 列表 ---------- */
 main {
   flex: 1;
@@ -396,6 +429,20 @@ main {
   color: #9ca3af;
   padding: 24px;
   font-size: 13px;
+}
+
+.preview-media.skip {
+  background: #f9fafb;
+  color: #4b5563;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
 }
 
 .preview-info {
