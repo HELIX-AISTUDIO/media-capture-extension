@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="bv20444riA3gcKm4C4xFXh">
+<head data-page-node-id="SOOb0wNQs1IdaGxwHjBGyI">
+  <meta charset="UTF-8" data-page-node-id="qmmswBtzqICBX3ymKsgtLi">
+  <title>网页媒体抓取器</title>
+  <link rel="stylesheet" href="popup.css" data-page-node-id="Gw9SjEHKvuX2FFzjPWRf12">
+</head>
+<body data-page-node-id="AahwPwrTMtdAR1qP4vtU2K">
+  <header data-page-node-id="ncaTouDo2gmCIXmRAVAdxH">
+    <h1 data-page-node-id="X3SvXVmeV8B8vOJ0Pr96AJ">网页媒体抓取器 <span id="count" class="count" data-page-node-id="E5oIW4FG3qUVxI5msJsFs4"></span></h1>
+    <div class="toolbar" data-page-node-id="9RIETODoIjsDRWWcfs8v5G">
+      <div class="filters" data-page-node-id="uOZQgY7vlIjqpUW3HuZMDG">
+        <button class="filter active" data-filter="video" data-page-node-id="YRoS4YXLvI0RtknPbFNUdf">视频</button>
+        <button class="filter" data-filter="image" data-page-node-id="xKny5NfQV696gMJzLPiyHO">图片</button>
+        <button class="filter" data-filter="audio" data-page-node-id="62uPrdhcI03WiH5RrknvGl">音频</button>
+        <button class="filter" data-filter="stream" data-page-node-id="RuJIQUGuRhWiiDXF06hGoY">m3u8/mpd</button>
+        <button class="filter" data-filter="all" data-page-node-id="Q9LGHgNjcmJCGxV6ZHkdt5">全部</button>
+      </div>
+      <div class="actions" data-page-node-id="SssYHPJeF1G05pLIYv0y81">
+        <button id="refresh" title="重新读取" data-page-node-id="Pg2PHBrtnds1FY6xqobCK3">刷新</button>
+        <button id="batchCopy" title="复制当前列表全部链接" data-page-node-id="nuAX4HYBWVFLqpDVXBfNOu">批量复制</button>
+        <button id="clear" title="清空列表" data-page-node-id="i2kYW9PovbKo5RI0wg1dAM">清空</button>
+      </div>
+    </div>
+    <div class="searchbar" data-page-node-id="rZGwVZEto94l5oye65sPlF">
+      <input id="keyword" type="text" placeholder="关键词筛选（文件名/URL/域名）" data-page-node-id="9HPXmIB5D0ZrMlPhKJDodT">
+      <input id="sizeFilter" type="text" placeholder="大小筛选，如 data-page-node-id="wy4Wj8i29RxTttdBDEmYOI" >100KB 或 500-1000MB">
+      <select id="sortOrder" title="排序方式" data-page-node-id="ZQOzBpSnYPcxRqLYYSZvDA">
+        <option value="desc" data-page-node-id="ABFKpvuGWNxQncTz7PrsGI">最新置顶</option>
+        <option value="asc" data-page-node-id="NWwuo81PYtXsr0z52RbiB0">最旧置顶</option>
+        <option value="size" data-page-node-id="zJAfYAAZHmkY8tBHFB5JLs">按大小</option>
+      </select>
+    </div>
+  </header>
+
+  <main id="list" data-page-node-id="p1jj1Oat4FzOtFPp0ALkEQ">
+    <div class="empty" data-page-node-id="gG0FKicoWwTaclqZvvN2EV">正在读取资源…</div>
+  </main>
+
+  <footer data-page-node-id="hIzT7SYF7RgG1oOohfhb5R">
+    提示：DRM 加密视频无法抓取；m3u8/mpd 可点击「解析」查看分片；下载失败请用「打开」在新标签页另存。
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
