@@ -129,3 +129,15 @@ edge_media_catch_ext/
 - **📦 最新版本**：在 [Releases](https://github.com/COLORS-STUDIO/media-capture-extension/releases) 下载 zip 包，解压后按上方「手动安装步骤」加载。
 
 > 提交前建议先浏览已有 Issues，避免重复；反馈时尽量附截图或控制台报错，能显著加快定位。
+
+---
+
+## 作者
+
+**HELIX AI STUDIO**（[@COLORS-STUDIO](https://github.com/COLORS-STUDIO)）
+
+AI Studio · AIGC 短剧与动画创作者 · 全栈开发者
+探索 AI 视频生成、提示词工程与自定义工具开发。
+
+- GitHub：<https://github.com/COLORS-STUDIO>
+- 项目仓库：<https://github.com/COLORS-STUDIO/media-capture-extension>
