@@ -124,9 +124,9 @@ edge_media_catch_ext/
 
 欢迎使用并反馈问题，你的建议是项目优化的动力：
 
-- **🐛 Bug 反馈**：前往 [Issues](https://github.com/COLORS-STUDIO/media-capture-extension/issues) 选择「Bug 反馈」模板提交，请附浏览器版本、扩展版本与复现步骤。
-- **💡 功能建议**：前往 [Issues](https://github.com/COLORS-STUDIO/media-capture-extension/issues) 选择「功能建议」模板提交，描述使用场景与期望效果。
-- **📦 最新版本**：在 [Releases](https://github.com/COLORS-STUDIO/media-capture-extension/releases) 下载 zip 包，解压后按上方「手动安装步骤」加载。
+- **🐛 Bug 反馈**：前往 [Issues](https://github.com/HELIX-AISTUDIO/media-capture-extension/issues) 选择「Bug 反馈」模板提交，请附浏览器版本、扩展版本与复现步骤。
+- **💡 功能建议**：前往 [Issues](https://github.com/HELIX-AISTUDIO/media-capture-extension/issues) 选择「功能建议」模板提交，描述使用场景与期望效果。
+- **📦 最新版本**：在 [Releases](https://github.com/HELIX-AISTUDIO/media-capture-extension/releases) 下载 zip 包，解压后按上方「手动安装步骤」加载。
 
 > 提交前建议先浏览已有 Issues，避免重复；反馈时尽量附截图或控制台报错，能显著加快定位。
 
@@ -134,10 +134,10 @@ edge_media_catch_ext/
 
 ## 作者
 
-**HELIX AI STUDIO**（[@COLORS-STUDIO](https://github.com/COLORS-STUDIO)）
+**HELIX AI STUDIO**（[@HELIX-AISTUDIO](https://github.com/HELIX-AISTUDIO)）
 
 AI Studio · AIGC 短剧与动画创作者 · 全栈开发者
 探索 AI 视频生成、提示词工程与自定义工具开发。
 
-- GitHub：<https://github.com/COLORS-STUDIO>
-- 项目仓库：<https://github.com/COLORS-STUDIO/media-capture-extension>
+- GitHub：<https://github.com/HELIX-AISTUDIO>
+- 项目仓库：<https://github.com/HELIX-AISTUDIO/media-capture-extension>

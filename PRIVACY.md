@@ -61,4 +61,4 @@
 ## 八、联系我们
 
 如对本隐私政策有任何疑问，请通过本项目 GitHub 仓库提交 Issue：
-https://github.com/COLORS-STUDIO/media-capture-extension/issues
+https://github.com/HELIX-AISTUDIO/media-capture-extension/issues
