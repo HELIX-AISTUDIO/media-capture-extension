@@ -62,3 +62,30 @@
   已就绪数据」，避免额外请求与扫描核心改动。
 - `chrome.debugger` 协议（猫抓抓某些加密流用）：MV3 扩展页面受限、且违反合规 → 本项目不实现，
   仅提示用户用本地 ffmpeg 合并 DASH 音视频。
+
+---
+
+## 2026-09-09 · 流程沉淀：GitHub 个人资料 → 本地项目同步
+
+**场景**：开发者更新 GitHub 个人资料（显示名 / 邮箱 / bio）后，需同步本地项目署名与 git 身份。
+
+### 同步清单（按优先级）
+| 位置 | 何时需要改 | 改法 |
+|---|---|---|
+| 仓库链接（README/PRIVACY/COMPLIANCE） | 仅当 **用户名** 变了 | `github.com/<用户名>/...` 全局替换 |
+| LICENSE 版权行 | 显示名/姓名变化 | `Copyright (c) <年份> <新名字> (<用户名>)` |
+| README「作者」章节 | 显示名/bio 变化 | 同步名字 + bio 摘要 + GitHub 链接 |
+| `git config user.name / user.email` | 显示名/邮箱变化 | `git config user.name "新名字"`；noreply 邮箱 = `<用户名>@users.noreply.github.com`，用户名不变则邮箱不变 |
+| 已打包的 Release zip | README/LICENSE 变化后 | 重新打包（`tar -a -c -f xx.zip --exclude=".git" --exclude="*.zip" <项目目录>`），保持包与仓库一致 |
+
+### 步骤
+1. **拉取公开资料（无需认证）**：`curl https://api.github.com/users/<用户名>`，取 `name` / `email`（默认隐藏，为 null）/ `bio` 字段。`updated_at` 可确认是否刚更新。
+2. **先判断用户名变没变**：`git push` 仍成功 = 用户名没变，仓库链接全部无需改。
+3. 按上表同步 LICENSE / README / git 身份。
+4. 重新打包 zip 并交付。
+5. commit + push（新 git 身份自动生效于新 commit）。
+
+### 注意
+- GitHub API 的 `email` 字段默认返回 null，公开邮箱需用户在 GitHub 设置中显式公开；本地 git 身份邮箱建议用 noreply 格式（避免真实邮箱泄露）。
+- 改名后 `git config user.name` 只影响**新 commit**，历史 commit 署名不变（如需改历史用 `git filter-branch`/`rebase`，慎用）。
+
