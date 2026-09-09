@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * popup/popup.js
+ * js/popup.js
  * 弹窗逻辑：读取资源列表并渲染，含筛选/排序/批量复制/预览/解析
  * ------------------------------------------------------------
  * 功能：
@@ -182,7 +182,7 @@ function openViewer(r, autoDownload) {
     mime: r.mime || ''
   });
   if (autoDownload) q.set('autodl', '1');
-  chrome.tabs.create({ url: chrome.runtime.getURL('viewer/viewer.html') + '?' + q.toString() });
+  chrome.tabs.create({ url: chrome.runtime.getURL('viewer.html') + '?' + q.toString() });
 }
 
 // 装饰/头像/logo 小图判定（深度搜索模式下用于卡片标记；默认模式已在抓取侧过滤）

@@ -4,6 +4,22 @@
 > 分类按版本内容使用 ✨ 新增、🔧 优化、🐛 修复、📝 更新等标签。
 > 每次发布时，请保证：`CHANGELOG.md 版本号 = git tag 版本号 = manifest.json version`。
 
+## v0.2.5 2026-09-09
+
+🔧 优化（目录结构重构，参考猫抓 cat-catch 的短目录风格）
+- 精简顶层目录，全部源码归入短命名文件夹：
+  - `background/service-worker.js` → `js/background.js`（同时去掉 `service-worker` 长文件名）
+  - `background/media-parser.js` / `m3u8-parser.js` / `mpd-parser.js` → `js/` 下同级
+  - `content/content.js` → `js/content.js`
+  - `popup/popup.html` → 根目录 `popup.html`；`popup/popup.css` → `css/popup.css`；`popup/popup.js` → `js/popup.js`
+  - `viewer/viewer.html` → 根目录 `viewer.html`；`viewer/viewer.js` → `js/viewer.js`
+  - `icons/` → `img/`
+  - `tools/generate_icons.py` → `js/utils/generate_icons.py`
+- 新增 `lib/` 目录（用于放置第三方库，当前为空）
+- `docs/` 仅存放项目知识库文档：`LEARNINGS.md` + 新增 `PROJECT_ARCH.md`
+- 同步修正所有资源引用路径：`manifest.json`、`popup.html`、`viewer.html`、`js/popup.js`、`README.md`
+- **业务源码零改动**：媒体嗅探、过滤规则、资源抓取、M3U8/DASH 解析、下载/预览逻辑全部保持原样
+
 ## v0.2.4 2026-09-09
 
 ✨ 新增

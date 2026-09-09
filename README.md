@@ -56,26 +56,30 @@
 
 ## 项目目录结构
 
+参考猫抓 [cat-catch](https://github.com/xifangczy/cat-catch) 的短目录风格整理：
+
 ```
 edge_media_catch_ext/
 ├── manifest.json                 # 扩展清单（MV3，权限最小化）
-├── background/
-│   ├── service-worker.js         # 后台 SW：非阻塞 webRequest + storage 持久化 + 消息路由
+├── popup.html                    # 弹窗页面
+├── viewer.html                   # 媒体查看器页面
+├── css/
+│   └── popup.css                 # 弹窗样式
+├── js/
+│   ├── background.js             # 后台 Service Worker：非阻塞 webRequest + storage 持久化 + 消息路由
 │   ├── media-parser.js           # 媒体正则库 + 分类 + 去重 + 安全文件名
 │   ├── m3u8-parser.js            # M3U8 解析器
-│   └── mpd-parser.js             # DASH/MPD 解析器
-├── content/
-│   └── content.js                # 内容脚本：DOM 扫描 + 深度搜索 + 缓存捕捉
-├── popup/
-│   ├── popup.html                # 弹窗结构
-│   ├── popup.css                 # 弹窗样式
-│   └── popup.js                  # 弹窗逻辑：筛选/排序/预览/解析/批量复制
-├── viewer/
-│   ├── viewer.html               # 媒体查看器页面（视频/音频「打开」跳转的全屏查看页）
-│   └── viewer.js                 # 查看器逻辑：Referer 注入 + 内嵌播放 + Blob 下载通道
-├── icons/                        # icon16/48/128.png
-├── tools/
-│   └── generate_icons.py         # 图标生成脚本（纯 Python 标准库）
+│   ├── mpd-parser.js             # DASH/MPD 解析器
+│   ├── content.js                # 内容脚本：DOM 扫描 + 深度搜索 + 缓存捕捉
+│   ├── popup.js                  # 弹窗逻辑：筛选/排序/预览/解析/批量复制
+│   ├── viewer.js                 # 查看器逻辑：Referer 注入 + 内嵌播放 + Blob 下载通道
+│   └── utils/
+│       └── generate_icons.py     # 图标生成脚本（纯 Python 标准库）
+├── img/                          # 扩展图标 icon16/48/128.png
+├── lib/                          # 第三方库目录（当前为空，供后续按需引入）
+├── docs/
+│   ├── LEARNINGS.md              # 猫抓源码学习沉淀
+│   └── PROJECT_ARCH.md           # 项目目录结构与架构说明
 ├── CHANGELOG.md                  # 更新日志（最新版本在最上方）
 └── README.md
 ```

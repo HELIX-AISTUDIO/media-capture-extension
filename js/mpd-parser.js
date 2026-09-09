@@ -1,7 +1,7 @@
 /**
  * ============================================================
- * background/mpd-parser.js
- * DASH / MPD 解析器（被 service-worker.js 通过 importScripts 引入）
+ * js/mpd-parser.js
+ * DASH / MPD 解析器（被 background.js 通过 importScripts 引入）
  * ------------------------------------------------------------
  * 支持（参考猫抓 mpd 解析器经验）：
  *   1. 解析 Period / AdaptationSet / Representation 层级

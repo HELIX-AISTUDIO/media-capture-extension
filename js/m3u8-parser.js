@@ -1,7 +1,7 @@
 /**
  * ============================================================
- * background/m3u8-parser.js
- * M3U8 解析器（被 service-worker.js 通过 importScripts 引入）
+ * js/m3u8-parser.js
+ * M3U8 解析器（被 background.js 通过 importScripts 引入）
  * ------------------------------------------------------------
  * 支持（参考猫抓 m3u8 解析器多年迭代经验）：
  *   1. 嵌套 m3u8（#EXT-X-STREAM-INF 多码率播放列表）
