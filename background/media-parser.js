@@ -60,6 +60,18 @@ const VIDEO_FRAGMENT_HOST = /(byteeffect|byteicdn|byteeffecttos|douyinpic|api\.d
 // ---------- 图片垃圾关键词：URL 命中即跳过 ----------
 const IMG_JUNK_RE = /(logo|icon|avatar|sprite|emoji|favicon|loading|placeholder|spinner|dot|badge|pixel|blank|transparent|tracking|beacon|spacer|1x1|arrow|btn|button|qrcode|qr_code|thum?b|tiny|small|mini|ad[-_]|banner|promo|slide|carousel|watermark|share[-_]|cover-?img|nav-|@!|_\d+_\d+\.|\d{2,4}x\d{2,4})/i;
 
+// ---------- 图片装饰/头像/logo 片段（按 URL 段匹配，避免误伤正文图） ----------
+// 仅当 avatar/logo/icon/head/profile 等作为独立片段（被 ./_- 或起止包围）出现才判为装饰，
+// 避免 "headline.jpg" 这类正文图被误杀（对应任务3：来源标记过滤）。
+const IMG_DECORATIVE_RE = /(?:^|[/._-])(avatar|logo|icon|head|profile|portrait|headshot|userpic|face)(?:[/._-]|$)/i;
+
+// ---------- 头像/logo 专用域名（命中即视为装饰小图） ----------
+const AVATAR_HOST_RE = /(gravatar\.com|libravatar|\.avatars?\.|\.avatar\.|profileimages|usercache|secure\.gravatar)/i;
+
+// ---------- 图片短边阈值（默认模式，DOM 图片按自然尺寸过滤） ----------
+// 短边 < 180px 视为图标/头像/装饰小图（对应任务3：尺寸过滤）。
+const IMG_SHORT_EDGE_MIN = 180;
+
 // ---------- 体积阈值 ----------
 const MIN_VIDEO_SIZE = 300 * 1024;      // 300KB，小于视为水印/预览片段
 const MIN_AUDIO_SIZE = 30 * 1024;       // 30KB
@@ -242,6 +254,10 @@ function isJunkImage(url, size) {
   // 显式过滤矢量图标/网站图标文件（svg/ico 基本不是"主要内容图"）
   if (/\.(svg|ico)(\?|#|$)/i.test(lower)) return true;
   if (IMG_JUNK_RE.test(lower)) return true;
+  // 头像/logo/icon/head 等装饰片段（按 URL 段匹配，避免误伤正文图）
+  if (IMG_DECORATIVE_RE.test(lower)) return true;
+  // 头像/logo 专用域名（gravatar 等）
+  if (AVATAR_HOST_RE.test(lower)) return true;
   if (IMG_HOST_BLOCKLIST.test(lower)) return true;
   if (size != null && size > 0 && size < MIN_IMAGE_SIZE) return true;
   return false;

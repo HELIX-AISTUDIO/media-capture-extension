@@ -252,6 +252,7 @@ main {
 .tag-media { background: #6b7280; }
 .tag-unknown { background: #6b7280; }
 .tag-stream { background: #7c3aed; }
+.tag-decor { background: #9ca3af; }
 
 .source {
   flex-shrink: 0;

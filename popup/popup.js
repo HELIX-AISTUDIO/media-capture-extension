@@ -185,6 +185,18 @@ function openViewer(r, autoDownload) {
   chrome.tabs.create({ url: chrome.runtime.getURL('viewer/viewer.html') + '?' + q.toString() });
 }
 
+// 装饰/头像/logo 小图判定（深度搜索模式下用于卡片标记；默认模式已在抓取侧过滤）
+function isDecorativeImage(r) {
+  if (!r || r.type !== 'image') return false;
+  const lower = (r.url || '').toLowerCase();
+  const DECOR_RE = /(?:^|[/._-])(avatar|logo|icon|head|profile|portrait|headshot|userpic|face)(?:[/._-]|$)/i;
+  const AVATAR_HOST = /(gravatar\.com|libravatar|\.avatars?\.|\.avatar\.|profileimages|usercache|secure\.gravatar)/i;
+  if (DECOR_RE.test(lower)) return true;
+  if (AVATAR_HOST.test(lower)) return true;
+  if (r.width != null && r.height != null && Math.min(r.width, r.height) < 180) return true;
+  return false;
+}
+
 // ---------- 主渲染 ----------
 function render() {
   const listEl = document.getElementById('list');
@@ -199,6 +211,10 @@ function render() {
   listEl.innerHTML = filtered.map((r, idx) => {
     const baseMeta = r.likelyAudio ? { label: '音频流', cls: 'tag-audio' } : (TYPE_META[r.type] || TYPE_META.unknown);
     const sMeta = SOURCE_META[r.source] || SOURCE_META.network;
+    // 装饰/头像/logo 小图标记：默认模式已被过滤，仅在深度搜索模式出现时显示此标记
+    const decorTag = isDecorativeImage(r)
+      ? '<span class="tag tag-decor" title="装饰/头像/logo 小图：默认模式已自动过滤，仅深度搜索模式显示">装饰</span>'
+      : '';
     const filename = r.filename || (() => {
       try {
         const last = new URL(r.url).pathname.split('/').filter(Boolean).pop();
@@ -214,6 +230,7 @@ function render() {
           <div class="item-head">
             <span class="tag ${baseMeta.cls}">${baseMeta.label}</span>
             <span class="source ${sMeta.cls}" title="来源：${sMeta.label === 'DOM' ? '页面元素/缓存' : '网络请求'}">${sMeta.label}</span>
+            ${decorTag}
             <span class="name" title="${escapeHtml(r.url)}">${escapeHtml(filename)}</span>
             ${dim ? `<span class="dim">${dim}</span>` : ''}
             <span class="size">${formatSize(r.size)}</span>
@@ -391,7 +408,7 @@ async function showPreview(r, autoParse) {
   const metaParts = [];
   if (r.likelyAudio) metaParts.push('<span class="preview-warn">⚠ 推测为 B 站音频流</span>');
   if (r.type === 'video' && /\.m4s(\?|#|$)/i.test(r.url)) {
-    metaParts.push('<span class="preview-warn">⚠ 视频流无音轨（DASH 分离）</span>');
+    metaParts.push('<span class="preview-warn">⚠ DASH 视频流无音轨（音视频已分离），请用本地 ffmpeg 合并音视频</span>');
   }
   if (r.type === 'stream') {
     metaParts.push('<span class="preview-warn">⚠ 流媒体：需解析分片后合并</span>');
@@ -645,16 +662,7 @@ document.getElementById('clear').addEventListener('click', () => {
   closePreview();
   chrome.runtime.sendMessage({ action: 'clearResources', tabId: currentTabId }, () => refresh());
 });
-document.getElementById('batchCopy').addEventListener('click', () => {
-  const filtered = filteredAndSorted();
-  const urls = filtered.map((r) => r.url).join('\n');
-  if (!urls) return;
-  navigator.clipboard.writeText(urls).then(() => {
-    const btn = document.getElementById('batchCopy');
-    btn.textContent = `已复制 ${filtered.length} 条`;
-    setTimeout(() => (btn.textContent = '批量复制'), 1500);
-  });
-});
+// 批量复制按钮已移除（v0.2.4 精简界面，仅保留刷新/清空）
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && previewOpen) closePreview();

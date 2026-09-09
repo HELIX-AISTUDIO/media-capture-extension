@@ -591,9 +591,10 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
         const type = classify(it.url, it.mime || null);
         // 默认模式：统一过滤闸门（DOM 资源通常已是媒体，此处兜底未知/非媒体）
         if (!shouldKeepResource(type, it.url, it.mime || null, it.size || null, currentCaptureMode)) return;
-        // 默认模式：DOM 图片按像素阈值过滤（DOM 图片无字节大小，用自然尺寸判断）
+        // 默认模式：DOM 图片按短边阈值过滤（DOM 图片无字节大小，用自然尺寸判断）。
+        // 短边 < 180px 视为图标/头像/装饰小图（v0.2.4：由 120 上调，仅默认模式生效）。
         if (currentCaptureMode === 'default' && type === 'image') {
-          if (it.width != null && it.height != null && it.width < 120 && it.height < 120) return;
+          if (it.width != null && it.height != null && Math.min(it.width, it.height) < IMG_SHORT_EDGE_MIN) return;
         }
         storeResource(tabId, {
           url: it.url,

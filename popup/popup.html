@@ -13,12 +13,9 @@
         <button class="filter active" data-filter="video" data-page-node-id="lqiYTeBRgZDc0zUWOqxhhW">视频</button>
         <button class="filter" data-filter="image" data-page-node-id="bPpnekLTZ9ntWBGs5ArPyc">图片</button>
         <button class="filter" data-filter="audio" data-page-node-id="6iiAW0Sgzsu1jyqUhZrCfD">音频</button>
-        <button class="filter" data-filter="stream" data-page-node-id="E8XExVCuha31Ima3A18VsW">m3u8/mpd</button>
-        <button class="filter" data-filter="all" data-page-node-id="zEdt8Ca9gT1h7pOhJCYGc7">全部</button>
       </div>
       <div class="actions" data-page-node-id="2EdcGiV2fmAHeNfHRzuOov">
         <button id="refresh" title="重新读取" data-page-node-id="9mFe0DeCgzuOlnZUBLmcFE">刷新</button>
-        <button id="batchCopy" title="复制当前列表全部链接" data-page-node-id="i7Oe6ExA48ui4uhGxAAgT1">批量复制</button>
         <button id="clear" title="清空列表" data-page-node-id="3ZSZFDXRzCdWbHYWMFMYM7">清空</button>
       </div>
     </div>
@@ -48,9 +45,9 @@
     <div class="empty" data-page-node-id="DffLDcEEWyoEzJXygdV45G">正在读取资源…</div>
   </main>
 
-  <footer data-page-node-id="0Ed44HUTS8OBzko0XHN1aZ">
-    提示：DRM 加密视频无法抓取；m3u8/mpd 可点击「解析」查看分片；下载失败请用「打开」在新标签页另存。
-  </footer>
+    <footer data-page-node-id="0Ed44HUTS8OBzko0XHN1aZ">
+      提示：DRM 加密视频无法抓取；DASH 视频流与音轨分离，需用本地 ffmpeg 合并音视频；下载失败请用「打开」在新标签页另存。
+    </footer>
 
   <script src="popup.js"></script>
 </body>
