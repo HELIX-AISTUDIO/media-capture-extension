@@ -159,17 +159,18 @@ function scanPerformance() {
     for (const e of entries) {
       const name = e.name || '';
       if (!isHttpUrl(name)) continue;
-      // 只挑媒体扩展名 / 媒体 initiatorType
-      const isMediaInitiator = /^(video|audio|img|image|media|xmlhttprequest|fetch|other)$/i.test(e.initiatorType || '');
-      if (/\.(m3u8|m4s|mp4|webm|mkv|flv|mov|avi|ts|m4v|mpd|mp3|aac|m4a|ogg|wav|flac|opus|png|jpe?g|gif|webp|bmp|avif)(\?|#|$)/i.test(name)) {
+      // 修复：只对「路径 pathname」做媒体扩展名匹配，不对完整 URL 匹配。
+      // 否则日志接口（如 data.bilibili.com/log/web?...含".m4s?"字样的查询串）
+      // 会因查询串里嵌着媒体扩展名被误报为媒体资源。
+      let path = name;
+      try { path = new URL(name).pathname; } catch { /* ignore */ }
+      if (/\.(m3u8|m4s|mp4|webm|mkv|flv|mov|avi|ts|m4v|mpd|mp3|aac|m4a|ogg|wav|flac|opus|png|jpe?g|gif|webp|bmp|avif)(\?|#|$)/i.test(path)) {
         out.push({
           url: name,
           size: e.transferSize > 0 ? e.transferSize : null,
           source: 'dom',
           ts: Math.round(performance.timeOrigin + e.startTime)
         });
-      } else if (isMediaInitiator && /^(video\/|audio\/|image\/)/i.test('')) {
-        // 占位，实际由扩展名命中
       }
     }
   } catch (e) { /* ignore */ }
@@ -179,6 +180,7 @@ function scanPerformance() {
 // ---------- 深度搜索：扫描 <script> 文本与 window 变量 ----------
 let deepSearchDone = false;
 function deepSearch() {
+  if (captureMode !== 'deep') return; // 脚本深搜仅在「深度搜索模式」执行，默认模式保持干净
   if (deepSearchDone) return;
   deepSearchDone = true;
   const out = [];
@@ -292,6 +294,8 @@ try {
     if (!msg || !msg.action) return;
     if (msg.action === 'setMode') {
       captureMode = msg.mode === 'deep' ? 'deep' : 'default';
+      // 切到深度模式时，触发脚本深搜（默认模式下深搜被跳过）
+      if (captureMode === 'deep') deepSearch();
       return;
     }
     if (msg.action === 'rescan') {
@@ -303,3 +307,40 @@ try {
     }
   });
 } catch (e) { /* 忽略 */ }
+
+// ---------- SPA 单页应用路由切换检测 ----------
+// 触发清理时机：history.pushState/replaceState 或 popstate/hashchange 导致
+// 「路由」变化时（history 路由看 pathname，hash 路由看 #/ 前缀），通知后台
+// 清空本 tab 旧资源，防止旧路由的媒体混入新路由列表。纯 hash 锚点（#section）
+// 不触发，避免误清。
+function spaRouteKey() {
+  const h = location.hash || '';
+  const hashRoute = /^#!?\//.test(h) ? h : '';
+  return location.pathname + location.search + hashRoute;
+}
+let lastSpaRoute = spaRouteKey();
+let spaTimer = null;
+function onSpaRouteChange() {
+  const key = spaRouteKey();
+  if (key === lastSpaRoute) return; // 无实质路由变化
+  lastSpaRoute = key;
+  if (spaTimer) return; // 防抖：连续 pushState 只通知一次
+  spaTimer = setTimeout(() => {
+    spaTimer = null;
+    try { chrome.runtime.sendMessage({ action: 'pageChanged' }); } catch (e) { /* ignore */ }
+  }, 80);
+}
+
+// patch history.pushState / replaceState
+['pushState', 'replaceState'].forEach((m) => {
+  const orig = history[m];
+  if (typeof orig === 'function') {
+    history[m] = function (...args) {
+      const ret = orig.apply(history, args);
+      onSpaRouteChange();
+      return ret;
+    };
+  }
+});
+window.addEventListener('popstate', onSpaRouteChange);
+window.addEventListener('hashchange', onSpaRouteChange);

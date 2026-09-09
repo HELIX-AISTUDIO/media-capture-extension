@@ -250,6 +250,7 @@ main {
 .tag-image { background: #059669; }
 .tag-audio { background: #d97706; }
 .tag-media { background: #6b7280; }
+.tag-unknown { background: #6b7280; }
 .tag-stream { background: #7c3aed; }
 
 .source {

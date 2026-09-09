@@ -70,6 +70,9 @@ edge_media_catch_ext/
 │   ├── popup.html                # 弹窗结构
 │   ├── popup.css                 # 弹窗样式
 │   └── popup.js                  # 弹窗逻辑：筛选/排序/预览/解析/批量复制
+├── viewer/
+│   ├── viewer.html               # 媒体查看器页面（视频/音频「打开」跳转的全屏查看页）
+│   └── viewer.js                 # 查看器逻辑：Referer 注入 + 内嵌播放 + Blob 下载通道
 ├── icons/                        # icon16/48/128.png
 ├── tools/
 │   └── generate_icons.py         # 图标生成脚本（纯 Python 标准库）

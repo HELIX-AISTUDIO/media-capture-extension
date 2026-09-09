@@ -4,6 +4,41 @@
 > 分类按版本内容使用 ✨ 新增、🔧 优化、🐛 修复、📝 更新等标签。
 > 每次发布时，请保证：`CHANGELOG.md 版本号 = git tag 版本号 = manifest.json version`。
 
+## v0.2.3 2026-09-09
+
+✨ 新增
+- 按 Tab 页面生命周期清理：页面刷新、URL 跳转、前进后退、tab 重载（`webNavigation.onCommitted` 主框架导航），以及 SPA 单页路由切换（content script 检测 `pushState`/`replaceState`/`popstate`/`hashchange`），自动清空上一个页面已捕获的全部资源，只保留当前活跃页面本次会话的资源
+- 「页面代数」机制：每个 tab 维护 `pageEpoch`，请求在 `onBeforeRequest` 记录发起时的代数、响应时校验，旧页面残留的延迟返回请求被丢弃，不再混入新页面列表
+- 白名单优先过滤：默认模式只保留明确属于「视频 / 音频 / 图片 / 流媒体播放列表」的资源，未知类型（扩展名与 content-type 都不明确）默认丢弃，仅深度搜索模式保留
+- 「媒体查看器」全屏页面（`viewer/`）：视频/音频点「打开」跳转到扩展查看器内嵌播放（自动注入 Referer），不再打开必 403 的原始地址，交互对齐图片类的「打开即看」；popup 预览失败/跳过卡片新增「在新页面查看」入口
+- 防盗链下载通道：视频/音频的「下载」改用「查看器 `fetch`（受 DNR Referer 注入保护）→ Blob → blob URL 另存」，带百分比进度；下载按「原始页面 Referer → 站点主页 Referer → 无 Referer」逐级重试，并内容嗅探防止把 403 错误页存成 .htm
+
+🔧 优化
+- 建立非媒体扩展名黑名单（css/html/htm/json/xml/txt/md/pdf/doc/xls/ppt/ttf/otf/woff/woff2/eot/js/ts/jsx 等）与非媒体 content-type 黑名单（text/html、application/json、font/* 等），双重校验
+- 图片默认过滤 `.ico`/`.svg` 图标，尺寸阈值由 8KB 上调至 50KB（小于 50KB 的图片默认隐藏）
+- `.ts` 歧义消解：按 content-type 区分「视频分片(video/mp2t)」与「TypeScript 源码」
+- 新增 `pls`、`tiff` 到流媒体/图片白名单
+- 主捕获点由 `onCompleted` 改为 `onResponseStarted`（更早拿到响应头，贴合猫抓捕获时机）
+- 移除宽泛的「CDN 域名一律视为媒体」逻辑（此前是「未知素材」过多的主因），改为「扩展名 + content-type + resourceType」综合判定
+- 列表读取时二次过滤（双保险）+ 存储版本标记 `storeVersion`：旧版本残留数据自动作废，读取时按当前规则重算类型并修正误标（如封面图 video → image）
+- DNR Referer 规则由「精确子域」放宽为「主域匹配」，覆盖 `upos-*` → `mirror-*` 等 CDN 重定向子域
+
+🐛 修复
+- 跳转瞬间请求延迟返回、旧页面残留请求混入新页面列表的边界 bug（tabId 隔离 + 页面代数双重防护）
+- B 站日志接口（`data.bilibili.com/log/web?...`）混入列表：其查询串内嵌 `.m4s?` 等字样导致缓存捕捉误报，现只对路径（pathname）匹配，并给 DOM 上报路径补上追踪域名黑名单
+- 封面图（如 `...-video-rcmd-cover.avif`）因 URL 含 `-video-` 被误判为视频：图片扩展名判定优先于关键字
+- `.m4s` 预览被一律跳过、无画面：m4s 是完整 fMP4 轨道可直接播放，改为尝试播放并在失败时降级提示
+- 防盗链 CDN（bilivideo.com）预览与下载必 403：MV3 的 `<video>`/`chrome.downloads` 均无法携带 Referer，现用 `declarativeNetRequest` 会话规则注入「抓取时记录的原始 Referer」
+- 权限名错误：此前误用 Firefox 的 `declarativeNetRequestWithHostPermissions`（Edge 报 "Permission is unknown" 导致 DNR 从未授权），已改为 Chrome/Edge 通用的 `declarativeNetRequest`
+- 下载变成 .htm 且提示"没有权限"：Chromium 已知限制——DNR 对 `chrome.downloads.download` 的请求不生效，改用 Blob 下载通道；另存时 Blob 带正确 MIME，避免扩展名被嗅探改成 .txt/.htm
+- 查看器空指针崩溃 `Cannot set properties of null`：autodl 视图无下载按钮时未判空，现已统一判空并在无按钮时自动创建进度状态行
+- B 站音频流（DASH 分离的 m4s，标「音频流」）混入「视频」分类：现在只出现在「音频」分类
+
+📝 更新
+- 多标签数据互相隔离：清理只作用于当前 tab，绝不全局清空，不影响其他标签页的抓取记录
+- popup 类型标签新增「未知」分类（仅深度模式出现），默认模式文案更新为「仅保留视频/音频/图片/流媒体」
+- 仅使用 Manifest V3 非阻塞 `webRequest` 观察与 `declarativeNetRequest` 会话规则，未使用任何废弃 MV2 接口
+
 ## v0.2.2 2026-09-08
 
 ✨ 新增

@@ -27,7 +27,7 @@ const TYPE_META = {
   image: { label: '图片', cls: 'tag-image' },
   audio: { label: '音频', cls: 'tag-audio' },
   stream: { label: '流媒体', cls: 'tag-stream' },
-  media: { label: '媒体', cls: 'tag-media' }
+  unknown: { label: '未知', cls: 'tag-unknown' }
 };
 
 const SOURCE_META = {
@@ -143,7 +143,12 @@ function filteredAndSorted() {
   let list = allResources.filter((r) => {
     // 类型筛选
     if (currentFilter !== 'all') {
-      if (r.type !== currentFilter && !(currentFilter === 'audio' && r.likelyAudio)) return false;
+      if (r.likelyAudio) {
+        // B 站音频流（DASH 分离的 m4s）只归「音频」分类，不再混入视频列表
+        if (currentFilter !== 'audio') return false;
+      } else if (r.type !== currentFilter) {
+        return false;
+      }
     }
     // 关键词筛选
     if (keyword) {
@@ -166,6 +171,20 @@ function filteredAndSorted() {
   return list;
 }
 
+// ---------- 媒体查看器（全屏页面） ----------
+// 视频/音频的「打开」不再跳原始地址（防盗链 CDN 会 403），改为打开
+// 扩展查看器页面，自动注入原始 Referer 后内嵌播放（参考图片的打开体验）
+function openViewer(r, autoDownload) {
+  const q = new URLSearchParams({
+    src: r.url,
+    referer: r.referer || currentTabUrl || '',
+    name: r.filename || '',
+    mime: r.mime || ''
+  });
+  if (autoDownload) q.set('autodl', '1');
+  chrome.tabs.create({ url: chrome.runtime.getURL('viewer/viewer.html') + '?' + q.toString() });
+}
+
 // ---------- 主渲染 ----------
 function render() {
   const listEl = document.getElementById('list');
@@ -178,7 +197,7 @@ function render() {
   }
 
   listEl.innerHTML = filtered.map((r, idx) => {
-    const baseMeta = r.likelyAudio ? { label: '音频流', cls: 'tag-audio' } : (TYPE_META[r.type] || TYPE_META.media);
+    const baseMeta = r.likelyAudio ? { label: '音频流', cls: 'tag-audio' } : (TYPE_META[r.type] || TYPE_META.unknown);
     const sMeta = SOURCE_META[r.source] || SOURCE_META.network;
     const filename = r.filename || (() => {
       try {
@@ -203,7 +222,7 @@ function render() {
           <div class="item-actions">
             <button class="btn btn-copy" data-url="${escapeHtml(r.url)}">复制</button>
             <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}" title="下载">下载</button>
-            <button class="btn btn-open" data-url="${escapeHtml(r.url)}" title="在新标签页打开">打开</button>
+            <button class="btn btn-open" data-url="${escapeHtml(r.url)}" title="${(r.type === 'video' || r.type === 'audio') ? '在媒体查看器中查看' : '在新标签页打开'}">打开</button>
             ${isStream ? `<button class="btn btn-parse" data-url="${escapeHtml(r.url)}" title="解析 m3u8/mpd 分片">解析</button>` : ''}
           </div>
         </div>
@@ -228,18 +247,26 @@ function render() {
       });
     });
   });
-  // 下载按钮
+  // 下载按钮：视频/音频走「查看器 Blob 下载」通道（downloads API 无法注入
+  // Referer，防盗链 CDN 会 403 存成 .htm）；图片等直接下载即可
   listEl.querySelectorAll('.btn-download').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      downloadUrl(btn, btn.dataset.url, btn.dataset.name);
+      const r2 = filtered.find((x) => x.url === btn.dataset.url);
+      if (r2 && (r2.type === 'video' || r2.type === 'audio')) {
+        openViewer(r2, true);
+        return;
+      }
+      downloadUrl(btn, btn.dataset.url, btn.dataset.name, (r2 && r2.referer) || currentTabUrl || '');
     });
   });
-  // 打开按钮
+  // 打开按钮：视频/音频 → 媒体查看器；其它 → 新标签页原始地址
   listEl.querySelectorAll('.btn-open').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      chrome.tabs.create({ url: btn.dataset.url });
+      const r2 = filtered.find((x) => x.url === btn.dataset.url);
+      if (r2 && (r2.type === 'video' || r2.type === 'audio')) openViewer(r2);
+      else chrome.tabs.create({ url: btn.dataset.url });
     });
   });
   // 解析按钮
@@ -264,10 +291,11 @@ function render() {
 }
 
 // ---------- 下载（带失败兜底） ----------
-function downloadUrl(btn, url, filename) {
+// referer 传给后台：防盗链 CDN 的下载请求需注入 Referer，否则 403 被存成 .htm
+function downloadUrl(btn, url, filename, referer) {
   btn.disabled = true;
   btn.textContent = '下载中…';
-  chrome.runtime.sendMessage({ action: 'download', url, filename }, (resp) => {
+  chrome.runtime.sendMessage({ action: 'download', url, filename, referer }, (resp) => {
     btn.disabled = false;
     if (resp && resp.ok) {
       btn.textContent = '已发起';
@@ -289,25 +317,25 @@ function closePreview() {
   if (overlay) overlay.classList.remove('active');
   previewOpen = false;
   previewResource = null;
+  // 预览关闭即移除 Referer 注入规则，不留全局副作用
+  try {
+    chrome.runtime.sendMessage({ action: 'clearPreviewReferer' }, () => void chrome.runtime.lastError);
+  } catch (e) { /* ignore */ }
 }
 
 // ---------- 防盗链/分片预览跳过判断 ----------
-// MV3 安全约束：扩展不能通过 <video>/<audio> 注入 Referer 头，
-// 因此对已知防盗链 CDN 或 DASH/HLS 分片资源跳过播放器，改为提示卡。
-const PREVIEW_SKIP_HOST_RE = /(^|\.)(bilivideo\.com|hdslb\.com|googlevideo\.com|ytimg\.com)$/i;
-const PREVIEW_SKIP_EXT_RE = /\.(m4s|m3u8|mpd|ts)(\?|#|$)/i;
+// 防盗链 CDN（bilivideo.com 等）不再跳过：打开预览时会先通过后台 DNR
+// 会话规则注入原始 Referer（见 SW previewReferer），CDN 校验可正常通过；
+// 仅跳过浏览器无法直接播放的格式与过小分片。
+const PREVIEW_SKIP_EXT_RE = /\.(m3u8|mpd|ts)(\?|#|$)/i; // 播放列表/原始TS流浏览器无法直接播放
 const PREVIEW_MIN_VIDEO_SIZE = 2 * 1024 * 1024; // 2MB，小于视为分片
 
 function shouldSkipVideoPreview(r) {
   if (!r) return false;
   const url = (r.url || '').toLowerCase();
-  // 1) 已知防盗链 CDN 主机
-  try {
-    if (PREVIEW_SKIP_HOST_RE.test(new URL(url).hostname)) return true;
-  } catch { /* ignore */ }
-  // 2) DASH/HLS 分片后缀
+  // 1) 无法直接播放的格式
   if (PREVIEW_SKIP_EXT_RE.test(url)) return true;
-  // 3) type='video' 且体积过小（很可能为分片而非完整视频）
+  // 2) type='video' 且体积过小（很可能为分片而非完整视频）
   if (r.type === 'video' && r.size != null && r.size > 0 && r.size < PREVIEW_MIN_VIDEO_SIZE) return true;
   return false;
 }
@@ -316,13 +344,14 @@ function buildPreviewMedia(r) {
   const url = escapeHtml(r.url);
   // 防盗链/分片资源：不渲染播放器，展示提示卡（元信息与操作按钮保留）
   if ((r.type === 'video' || r.type === 'audio') && shouldSkipVideoPreview(r)) {
-    return `<div class="preview-media skip">⚠ 预览跳过（可能需要 Referer 或该资源是分片）<br>请点「打开」在新标签页播放，或「下载」保存</div>`;
+    return `<div class="preview-media skip">⚠ 预览跳过（浏览器无法直接播放该格式，如 m3u8/ts）<br>
+      <button class="btn btn-viewer" style="margin-top:8px;">在新页面查看</button> 或点「下载」保存</div>`;
   }
   if (r.type === 'video') {
-    return `<video class="preview-media" controls autoplay preload="auto" src="${url}"></video>`;
+    return `<video class="preview-media" controls autoplay preload="auto" referrerpolicy="no-referrer" src="${url}"></video>`;
   }
   if (r.type === 'audio') {
-    return `<audio class="preview-media audio" controls autoplay preload="auto" src="${url}"></audio>`;
+    return `<audio class="preview-media audio" controls autoplay preload="auto" referrerpolicy="no-referrer" src="${url}"></audio>`;
   }
   if (r.type === 'image') {
     return `<img class="preview-media image" src="${url}" referrerpolicy="no-referrer" alt="">`;
@@ -333,7 +362,17 @@ function buildPreviewMedia(r) {
   return `<div class="preview-media unknown">无法预览该媒体类型</div>`;
 }
 
-function showPreview(r, autoParse) {
+async function showPreview(r, autoParse) {
+  // 先注入 Referer 会话规则，再渲染播放器——避免 <video> 请求先于规则发出
+  // 导致防盗链 CDN 首次请求就 403（注入的 Referer 用抓取时记录的原始值）
+  if ((r.type === 'video' || r.type === 'audio')) {
+    const ref = r.referer || currentTabUrl || '';
+    try {
+      if (ref) {
+        await chrome.runtime.sendMessage({ action: 'previewReferer', url: r.url, referer: ref });
+      }
+    } catch (e) { /* ignore */ }
+  }
   previewResource = r;
   let overlay = document.getElementById('previewOverlay');
   if (!overlay) {
@@ -357,7 +396,7 @@ function showPreview(r, autoParse) {
   if (r.type === 'stream') {
     metaParts.push('<span class="preview-warn">⚠ 流媒体：需解析分片后合并</span>');
   }
-  metaParts.push(TYPE_META[r.type] ? TYPE_META[r.type].label : '媒体');
+  metaParts.push(TYPE_META[r.type] ? TYPE_META[r.type].label : '未知');
   if (r.mime) metaParts.push(escapeHtml(r.mime));
   metaParts.push(formatSize(r.size));
   if (r.width && r.height) metaParts.push(`${r.width}×${r.height}`);
@@ -390,12 +429,24 @@ function showPreview(r, autoParse) {
   overlay.classList.add('active');
   previewOpen = true;
 
-  // 视频播放失败降级
+  // 视频播放失败降级：给出「在新页面查看」入口（查看器页同样注入 Referer）
   const mediaEl = overlay.querySelector('.preview-media');
   if (mediaEl && mediaEl.tagName === 'VIDEO') {
     mediaEl.addEventListener('error', () => {
       const wrap = overlay.querySelector('.preview-media-wrap');
-      if (wrap) wrap.innerHTML = `<div class="preview-media fail">播放失败（CDN 可能校验 Referer）。<br>请点「打开」在新标签页播放，或「下载」保存。</div>`;
+      if (wrap) wrap.innerHTML = `<div class="preview-media fail">播放失败（CDN 可能校验 Referer 或链接已过期）。<br>
+        <button class="btn btn-viewer" style="margin-top:8px;">在新页面查看</button> 或点「下载」保存</div>`;
+      const vb = overlay.querySelector('.btn-viewer');
+      if (vb) vb.addEventListener('click', () => { if (previewResource) openViewer(previewResource); });
+    });
+  }
+
+  // 提示卡（跳过/失败）里的「在新页面查看」统一绑定
+  const skipViewerBtn = overlay.querySelector('.preview-media.skip .btn-viewer');
+  if (skipViewerBtn) {
+    skipViewerBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (previewResource) openViewer(previewResource);
     });
   }
 
@@ -408,10 +459,16 @@ function showPreview(r, autoParse) {
     });
   });
   overlay.querySelector('.btn-download').addEventListener('click', (e) => {
-    downloadUrl(e.target, r.url, safeFileName(filename));
+    if (r.type === 'video' || r.type === 'audio') {
+      openViewer(r, true);
+      closePreview();
+      return;
+    }
+    downloadUrl(e.target, r.url, safeFileName(filename), r.referer || currentTabUrl || '');
   });
   overlay.querySelector('.btn-open').addEventListener('click', () => {
-    chrome.tabs.create({ url: r.url });
+    if (r.type === 'video' || r.type === 'audio') openViewer(r);
+    else chrome.tabs.create({ url: r.url });
   });
   const parseBtnEl = overlay.querySelector('#previewParse');
   if (parseBtnEl) {
@@ -610,5 +667,9 @@ refresh();
 // popup 打开期间保持后台 SW 活跃，避免长时间操作时 SW 被回收（参考猫抓 HeartBeat 思想）
 try {
   const hbPort = chrome.runtime.connect({ name: 'media-heartbeat' });
-  window.addEventListener('unload', () => { try { hbPort.disconnect(); } catch (e) { /* ignore */ } });
+  window.addEventListener('unload', () => {
+    try { hbPort.disconnect(); } catch (e) { /* ignore */ }
+    // popup 关闭时兜底清理预览 Referer 规则
+    try { chrome.runtime.sendMessage({ action: 'clearPreviewReferer' }, () => void chrome.runtime.lastError); } catch (e) { /* ignore */ }
+  });
 } catch (e) { /* ignore */ }

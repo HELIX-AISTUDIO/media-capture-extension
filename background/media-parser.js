@@ -4,30 +4,52 @@
  * 媒体资源解析基础库（被 service-worker.js 通过 importScripts 引入）
  * ------------------------------------------------------------
  * 提供：
- *   1. 成熟媒体正则库（覆盖市面 99% 网页媒体资源规则）
- *   2. 资源类型分类 classify()
- *   3. 追踪/日志接口识别 isTrackingUrl()
- *   4. 垃圾图片/水印片段过滤
- *   5. 安全文件名生成 safeFilename()（修复超长/特殊字符导致下载失败）
- *   6. URL 去重规范化 normalizeUrl()
+ *   1. 媒体扩展名「白名单」分类（视频/音频/图片/流媒体）
+ *   2. 非媒体扩展名「黑名单」（css/html/json/字体/脚本/文档等）
+ *   3. content-type 校验（明确非媒体的响应头直接过滤）
+ *   4. 资源类型分类 classify()（返回 video/audio/image/stream/unknown）
+ *   5. 默认模式统一过滤闸门 shouldKeepResource()（白名单优先）
+ *   6. 追踪/日志接口识别 isTrackingUrl()
+ *   7. 垃圾图片/水印片段过滤 isJunkImage()
+ *   8. 安全文件名 safeFilename()、URL 去重 normalizeUrl()
+ *
+ * v0.2.3 过滤原则（对标猫抓"干净列表"）：
+ *   - 白名单优先：只允许明确的 视频/音频/图片/流媒体 进入列表；
+ *   - 黑名单补刀：css/html/json/xml/字体/脚本/文档 等直接过滤；
+ *   - content-type + 后缀 双重校验；图片 <50KB 默认隐藏；
+ *   - 「未知」类型（扩展名/mime 都不明确）默认丢弃，仅深度模式保留。
  *
  * 注意：所有正则均不设 global 标志（避免 lastIndex 复用导致的
  *       "匹配失效" 历史 BUG，参考猫抓 CHANGELOG 2.4.5）。
  * ============================================================
  */
 
-// ---------- 媒体后缀正则（仅匹配 URL pathname 末尾） ----------
-const MEDIA_EXT_RE = /\.(m3u8|m4s|mp4|webm|mkv|flv|mov|avi|ts|m4v|ogv|mp3|aac|m4a|ogg|wav|flac|opus|png|jpe?g|gif|webp|bmp|svg|ico|avif|apng|heic|mpd|mpg|mpeg|3gp|3g2|f4v|f4a|f4b|wmv|asf|rmvb|rm|vob|mts|m2ts|aac|ac3|eac3|dts|ape|wma|mka|webm)(\?|#|$)/i;
+// ---------- 视频扩展名白名单 ----------
+const VIDEO_EXT_RE = /\.(mp4|webm|m4v|avi|mov|mkv|flv|wmv|m4s|ogv|mpg|mpeg|3gp|f4v|asf|rmvb|mts|m2ts|vob)(\?|#|$)/i;
 
-// ---------- 流媒体描述文件 ----------
-const STREAM_EXT_RE = /\.(m3u8|mpd)(\?|#|$)/i;
+// ---------- 音频扩展名白名单 ----------
+const AUDIO_EXT_RE = /\.(mp3|wav|flac|aac|ogg|m4a|wma|opus|ac3|ape|mka)(\?|#|$)/i;
+
+// ---------- 图片扩展名白名单（不含 ico/svg，二者默认过滤） ----------
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|bmp|webp|tiff?|avif|apng|heic)(\?|#|$)/i;
+
+// ---------- 流媒体播放列表（m3u8/mpd/pls） ----------
+const STREAM_EXT_RE = /\.(m3u8|mpd|pls)(\?|#|$)/i;
+
+// ---------- 任意媒体扩展名（供"是否媒体 URL"粗判，含 ico/svg） ----------
+const MEDIA_EXT_RE = /\.(m3u8|mpd|pls|mp4|webm|m4v|avi|mov|mkv|flv|wmv|m4s|ogv|mpg|mpeg|3gp|f4v|asf|rmvb|mts|m2ts|vob|mp3|wav|flac|aac|ogg|m4a|wma|opus|ac3|ape|mka|jpe?g|png|gif|bmp|webp|tiff?|avif|apng|heic|svg|ico)(\?|#|$)/i;
+
+// ---------- 明确非媒体扩展名黑名单（命中即过滤） ----------
+// 注意：不包含 .ts —— .ts 既是视频分片(M2TS)又是 TypeScript 源码，
+//       由 classify() 结合 content-type 单独消歧。
+const NON_MEDIA_EXT_RE = /\.(css|html?|json|xml|txt|md|markdown|pdf|docx?|xlsx?|pptx?|ttf|otf|woff2?|eot|js|mjs|jsx|tsx|wasm|map|csv|zip|rar|7z|tar|gzip|gz|swf|dat|db|sqlite|log|ya?ml|toml|ini)(\?|#|$)/i;
+
+// ---------- 明确非媒体的 content-type（命中即过滤，即使 URL 带媒体后缀） ----------
+const NON_MEDIA_MIME_RE = /^(?:text\/(?:html|css|javascript|plain|xml)|application\/(?:json|xml|javascript|x-www-form-urlencoded|pdf|xhtml\+xml|msword|vnd\.ms-excel|vnd\.ms-powerpoint|vnd\.ms-fontobject|font-(?:woff2?|ttf|otf))|font\/|image\/svg\+xml|image\/x-icon|image\/vnd\.microsoft\.icon)/i;
 
 // ---------- 追踪/日志域名（命中即跳过） ----------
 const TRACKING_HOSTS = /(?:^|\.)(google-analytics\.com|googletagmanager\.com|hm\.baidu\.com|data\.bilibili\.com|t\.bilibili\.com|cm\.bilibili\.com|track\.alicdn\.com|mmstat\.com|log\.|analytics|report|track|collect)(\.|$|:)/i;
 const TRACKING_PATHS = /\/(log|track|analytics|beacon|pixel|stat|report|collect|ping)(\/|$|\?)/i;
-
-// ---------- 已知视频/图片 CDN 域名（命中即放行，但要排除追踪路径） ----------
-const CDN_HOSTS = /(?:^|\.)(bilivideo\.com|hdslb\.com|googlevideo\.com|ytimg\.com|akamaized\.net|cloudfront\.net|alicdn\.com|taobaocdn\.com|tmall\.com|360buyimg\.com|douyinvod\.com|ixigua\.com|zjcdn\.com|snssdk\.com|byteimg\.com|bytecdn\.com|pstatp\.com|wscdns\.com|gimg\.baidu\.com|bdstatic\.com|alicdn\.net|dgtm\.com|jd\.com|vzuu\.com)/i;
 
 // ---------- 平台图片黑名单：抖音/YouTube/统计/装饰图 ----------
 const IMG_HOST_BLOCKLIST = /(\.ytimg\.com$|googlevideo\.com|douyinpic\.com|byteeffect|byteicdn|byteimg|byteimgcn|mmstat|alipay|aliimg|bdimg|baidu\.com\/img|doubleclick|googlesyndication|gstatic\.com\/ads)/i;
@@ -41,7 +63,7 @@ const IMG_JUNK_RE = /(logo|icon|avatar|sprite|emoji|favicon|loading|placeholder|
 // ---------- 体积阈值 ----------
 const MIN_VIDEO_SIZE = 300 * 1024;      // 300KB，小于视为水印/预览片段
 const MIN_AUDIO_SIZE = 30 * 1024;       // 30KB
-const MIN_IMAGE_SIZE = 8 * 1024;        // 8KB，小于视为图标/占位
+const MIN_IMAGE_SIZE = 50 * 1024;       // 50KB，小于视为图标/占位/小图（v0.2.3 由 8KB 上调）
 const BILI_AUDIO_M4S_MAX = 20 * 1024 * 1024; // B 站 m4s 音频流通常 < 20MB
 const MAX_RESOURCES_PER_TAB = 500;      // 每标签页最大资源数（防内存泄漏）
 
@@ -61,11 +83,10 @@ function isTrackingUrl(url) {
   }
 }
 
+// 粗判：URL 是否带媒体扩展名（含 ico/svg，供"快速跳过非媒体"用）
 function isMediaUrl(url) {
   try {
-    const u = new URL(url);
-    if (CDN_HOSTS.test(u.hostname)) return !TRACKING_PATHS.test(u.pathname);
-    return MEDIA_EXT_RE.test(u.pathname);
+    return MEDIA_EXT_RE.test(new URL(url).pathname);
   } catch {
     return false;
   }
@@ -77,6 +98,20 @@ function isStreamUrl(url) {
   } catch {
     return false;
   }
+}
+
+// 明确非媒体的扩展名黑名单（css/html/json/字体/脚本/文档等）
+function isNonMediaUrl(url) {
+  try {
+    return NON_MEDIA_EXT_RE.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+// 明确非媒体的 content-type
+function isNonMediaMime(mime) {
+  return NON_MEDIA_MIME_RE.test(mime || '');
 }
 
 function isMediaMime(mime) {
@@ -167,25 +202,41 @@ function parseContentDisposition(headers) {
 
 /**
  * 资源类型分类。
- * 优先识别 DASH 音/视轨关键字（media-audio / media-video），
- * 再按扩展名、MIME 兜底。
+ * 白名单优先：先按 URL 关键字/扩展名精确归类，再按 MIME 兜底；
+ * 两者都不匹配则返回 'unknown'（默认模式过滤，深度模式保留）。
  */
 function classify(url, mime) {
   const lower = (url || '').toLowerCase();
+  // 流媒体播放列表
+  if (STREAM_EXT_RE.test(lower)) return 'stream';
+  // 图片扩展名优先于关键字判断：避免 ".../video-rcmd-cover.avif" 这类封面图
+  // 因 URL 含 "-video-" 字样被误判为视频（修复垃圾分类）
+  if (IMAGE_EXT_RE.test(lower) || /\.(svg|ico)(\?|#|$)/i.test(lower)) return 'image';
+  // DASH 音/视轨关键字（media-audio / media-video）
   if (/(media-?audio|-audio-|\/audio\/|_audio_)/.test(lower)) return 'audio';
   if (/(media-?video|-video-|\/video\/|_video_)/.test(lower)) return 'video';
-  if (/\.(m3u8|mpd)(\?|#|$)/.test(lower)) return 'stream';
-  if (/\.(mp4|webm|mkv|flv|mov|avi|ts|m4s|m4v|ogv|mpg|mpeg|3gp|f4v|wmv|asf|rmvb|mts|m2ts|vob)(\?|#|$)/.test(lower)) return 'video';
-  if (/\.(mp3|aac|m4a|ogg|wav|flac|opus|ac3|ape|wma|mka)(\?|#|$)/.test(lower)) return 'audio';
-  if (/\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|apng|heic)(\?|#|$)/.test(lower)) return 'image';
-  if (/^video\//.test(mime || '')) return 'video';
-  if (/^audio\//.test(mime || '')) return 'audio';
-  if (/^image\//.test(mime || '')) return 'image';
+  // 视频扩展名
+  if (VIDEO_EXT_RE.test(lower)) return 'video';
+  // .ts 歧义消解：mime 明确为视频流（或未知）才视为视频分片；
+  // 否则（text/javascript / application/typescript 等）视为脚本 → unknown
+  if (/\.ts(\?|#|$)/.test(lower)) {
+    if (mime == null) return 'video';
+    if (/^video\//i.test(mime)) return 'video';
+    return 'unknown';
+  }
+  // 音频扩展名
+  if (AUDIO_EXT_RE.test(lower)) return 'audio';
+  // 图片扩展名（含 ico/svg；默认模式下由 isJunkImage 再过滤）
+  if (IMAGE_EXT_RE.test(lower) || /\.(svg|ico)(\?|#|$)/i.test(lower)) return 'image';
+  // MIME 兜底
+  if (/^video\//i.test(mime || '')) return 'video';
+  if (/^audio\//i.test(mime || '')) return 'audio';
+  if (/^image\//i.test(mime || '')) return 'image';
   if (/(mpegurl|dash\+xml)/i.test(mime || '')) return 'stream';
-  return 'media';
+  return 'unknown';
 }
 
-// 网络层图片垃圾过滤
+// 网络层图片垃圾过滤（默认模式）
 function isJunkImage(url, size) {
   const lower = (url || '').toLowerCase();
   // 显式过滤矢量图标/网站图标文件（svg/ico 基本不是"主要内容图"）
@@ -194,4 +245,33 @@ function isJunkImage(url, size) {
   if (IMG_HOST_BLOCKLIST.test(lower)) return true;
   if (size != null && size > 0 && size < MIN_IMAGE_SIZE) return true;
   return false;
+}
+
+/**
+ * 默认模式统一过滤闸门（白名单优先 + 黑名单补刀 + content-type + 尺寸）。
+ * @param {string} type  classify() 结果
+ * @param {string} url   资源 URL
+ * @param {string} mime  content-type（可为 null）
+ * @param {number} size  字节大小（可为 null）
+ * @param {string} mode  'default' | 'deep'
+ * @returns {boolean} true=保留，false=过滤
+ */
+function shouldKeepResource(type, url, mime, size, mode) {
+  // 深度搜索模式：不过滤（追踪接口在调用方单独过滤）
+  if (mode === 'deep') return true;
+  // 1) 白名单：类型必须明确为 视频/音频/图片/流媒体，未知类型默认丢弃
+  if (type !== 'video' && type !== 'audio' && type !== 'image' && type !== 'stream') return false;
+  // 2) 黑名单：明确非媒体扩展名（css/html/json/字体/脚本/文档）
+  if (isNonMediaUrl(url)) return false;
+  // 3) content-type 校验：响应头明确非媒体（即使 URL 带媒体后缀）
+  if (isNonMediaMime(mime)) return false;
+  // 4) 图片专用：ico/svg、垃圾关键词、平台黑名单、过小（<50KB）
+  if (type === 'image' && isJunkImage(url, size)) return false;
+  // 5) 视频/音频片段过滤（过小视为水印/预览片段）
+  if (type === 'video') {
+    if (size != null && size < MIN_VIDEO_SIZE) return false;
+    if (VIDEO_FRAGMENT_HOST.test(url || '')) return false;
+  }
+  if (type === 'audio' && size != null && size < MIN_AUDIO_SIZE) return false;
+  return true;
 }
