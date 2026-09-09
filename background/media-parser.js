@@ -73,11 +73,15 @@ const AVATAR_HOST_RE = /(gravatar\.com|libravatar|\.avatars?\.|\.avatar\.|profil
 const IMG_SHORT_EDGE_MIN = 180;
 
 // ---------- 体积阈值 ----------
+// 参考猫抓 CheckType() + G.Type 配置表的「按类型设最小尺寸闸门」设计：
+// 猫抓把每种 MIME 的开关(state)与最小尺寸(size)放在一张表里统一校验，避免散落的 if-else。
+// 本项目用分散常量实现同样思路（视频/音频/图片各自阈值），后续可收敛为一张 TYPE_LIMITS 表；
+// 图片阈值 IMG_SHORT_EDGE_MIN=180 则对应猫抓「按自然尺寸过滤小图」的 DOM 侧判定。
 const MIN_VIDEO_SIZE = 300 * 1024;      // 300KB，小于视为水印/预览片段
 const MIN_AUDIO_SIZE = 30 * 1024;       // 30KB
 const MIN_IMAGE_SIZE = 50 * 1024;       // 50KB，小于视为图标/占位/小图（v0.2.3 由 8KB 上调）
 const BILI_AUDIO_M4S_MAX = 20 * 1024 * 1024; // B 站 m4s 音频流通常 < 20MB
-const MAX_RESOURCES_PER_TAB = 500;      // 每标签页最大资源数（防内存泄漏）
+const MAX_RESOURCES_PER_TAB = 500;      // 每标签页最大资源数（防内存泄漏，对齐猫抓 tabFingerprints 上限）
 
 // ---------- 工具函数 ----------
 function isHttpUrl(u) {

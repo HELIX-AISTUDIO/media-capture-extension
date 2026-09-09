@@ -176,6 +176,9 @@ function resetTabForNavigation(tabId) {
 
 // ---------- 孤儿 tab 回收 ----------
 // 用 tabs.query 快照删除已关闭 tab 的残留数据（参考猫抓 clearRedundant 思想）
+// 孤儿 tab 回收：参考猫抓 clearRedundant() 思路——按当前存活 tab 集合清理
+// 已关闭 tab 的残留数据，防止多 tab 并发下 storage.session 无限增长（内存泄漏）。
+// 另：单 tab 上限 MAX_RESOURCES_PER_TAB=500 与猫抓 tabFingerprints 的 500 上限一致。
 function sweepOrphanTabs() {
   chrome.tabs.query({}, (tabs) => {
     if (chrome.runtime.lastError) return;
