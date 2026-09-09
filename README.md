@@ -117,3 +117,15 @@ edge_media_catch_ext/
 6. 本项目仅为个人学习开发（MIT License），不保证持续可用，不承担任何因使用产生的间接损失。
 
 **隐私政策：** 本扩展不收集、不传输、不上传任何个人数据，详见 [PRIVACY.md](./PRIVACY.md)。
+
+---
+
+## 反馈与贡献
+
+欢迎使用并反馈问题，你的建议是项目优化的动力：
+
+- **🐛 Bug 反馈**：前往 [Issues](https://github.com/COLORS-STUDIO/media-capture-extension/issues) 选择「Bug 反馈」模板提交，请附浏览器版本、扩展版本与复现步骤。
+- **💡 功能建议**：前往 [Issues](https://github.com/COLORS-STUDIO/media-capture-extension/issues) 选择「功能建议」模板提交，描述使用场景与期望效果。
+- **📦 最新版本**：在 [Releases](https://github.com/COLORS-STUDIO/media-capture-extension/releases) 下载 zip 包，解压后按上方「手动安装步骤」加载。
+
+> 提交前建议先浏览已有 Issues，避免重复；反馈时尽量附截图或控制台报错，能显著加快定位。

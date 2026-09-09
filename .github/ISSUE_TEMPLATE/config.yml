@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 安装帮助
+    url: https://github.com/COLORS-STUDIO/media-capture-extension/blob/main/README.md
+    about: 先查看 README 的安装步骤与已知限制
