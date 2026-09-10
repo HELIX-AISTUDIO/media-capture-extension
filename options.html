@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>网页媒体抓取器 · 规则设置</title>
+  <title data-i18n="options_title">网页媒体抓取器 · 规则设置</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -71,8 +71,8 @@
 </head>
 <body>
   <header>
-    <h1>网页媒体抓取器 · 规则设置</h1>
-    <p class="hint">
+    <h1 data-i18n="options_h1">网页媒体抓取器 · 规则设置</h1>
+    <p class="hint" data-i18n-html="options_header_hint">
       规则保存在浏览器<b>同步存储</b>（storage.sync），保存后立即生效，无需重载扩展。<br>
       <span class="safe">安全承诺：四张表全部留空 = 与默认行为完全一致</span>——未配置的用户不会误伤、误删任何资源。
     </p>
@@ -82,76 +82,76 @@
     <section>
       <div class="sec-head">
         <div>
-          <h2>1. 扩展名规则（Ext）</h2>
-          <p class="hint">按资源扩展名精确匹配。命中后按「运算符 + 尺寸」判定：满足则保留，不满足则丢弃。<br>
+          <h2 data-i18n="options_sec_ext_title">1. 扩展名规则（Ext）</h2>
+          <p class="hint" data-i18n-html="options_sec_ext_hint">按资源扩展名精确匹配。命中后按「运算符 + 尺寸」判定：满足则保留，不满足则丢弃。<br>
             例：扩展名 <code>mp4</code>、运算符 <code>&gt;=</code>、尺寸 <code>500</code> KB → 小于 500KB 的 mp4 一律不抓。</p>
         </div>
       </div>
       <table>
         <thead>
           <tr>
-            <th class="col-state">启用</th>
-            <th class="col-ext">扩展名（不含点）</th>
-            <th class="col-op">运算符</th>
-            <th class="col-num">尺寸</th>
-            <th class="col-unit">单位</th>
-            <th class="col-del">操作</th>
+            <th class="col-state" data-i18n="options_th_enable">启用</th>
+            <th class="col-ext" data-i18n="options_th_ext">扩展名（不含点）</th>
+            <th class="col-op" data-i18n="options_th_operator">运算符</th>
+            <th class="col-num" data-i18n="options_th_size">尺寸</th>
+            <th class="col-unit" data-i18n="options_th_unit">单位</th>
+            <th class="col-del" data-i18n="options_th_action">操作</th>
           </tr>
         </thead>
         <tbody id="extBody"></tbody>
       </table>
-      <button class="add-btn" data-add="Ext">+ 添加扩展名规则</button>
+      <button class="add-btn" data-add="Ext" data-i18n="options_btn_add_ext">+ 添加扩展名规则</button>
     </section>
 
     <section>
       <div class="sec-head">
         <div>
-          <h2>2. MIME 类型规则（Type）</h2>
-          <p class="hint">按响应 content-type 匹配，支持通配符 <code>*</code>（如 <code>video/*</code>、<code>audio/mpeg</code>）。<br>
+          <h2 data-i18n="options_sec_type_title">2. MIME 类型规则（Type）</h2>
+          <p class="hint" data-i18n-html="options_sec_type_hint">按响应 content-type 匹配，支持通配符 <code>*</code>（如 <code>video/*</code>、<code>audio/mpeg</code>）。<br>
             判定方式与扩展名规则相同；MIME 规则在扩展名规则之后生效。</p>
         </div>
       </div>
       <table>
         <thead>
           <tr>
-            <th class="col-state">启用</th>
-            <th class="col-mime">MIME（支持 *）</th>
-            <th class="col-op">运算符</th>
-            <th class="col-num">尺寸</th>
-            <th class="col-unit">单位</th>
-            <th class="col-del">操作</th>
+            <th class="col-state" data-i18n="options_th_enable">启用</th>
+            <th class="col-mime" data-i18n="options_th_mime">MIME（支持 *）</th>
+            <th class="col-op" data-i18n="options_th_operator">运算符</th>
+            <th class="col-num" data-i18n="options_th_size">尺寸</th>
+            <th class="col-unit" data-i18n="options_th_unit">单位</th>
+            <th class="col-del" data-i18n="options_th_action">操作</th>
           </tr>
         </thead>
         <tbody id="typeBody"></tbody>
       </table>
-      <button class="add-btn" data-add="Type">+ 添加 MIME 规则</button>
+      <button class="add-btn" data-add="Type" data-i18n="options_btn_add_type">+ 添加 MIME 规则</button>
     </section>
 
     <section>
       <div class="sec-head">
         <div>
-          <h2>3. 自定义正则（Regex）</h2>
-          <p class="hint">对完整 URL 匹配。勾选「黑标」则命中即丢弃；填写「改写为」则用捕获组重写 URL（如 <code>$1</code>）。<br>
+          <h2 data-i18n="options_sec_regex_title">3. 自定义正则（Regex）</h2>
+          <p class="hint" data-i18n-html="options_sec_regex_hint">对完整 URL 匹配。勾选「黑标」则命中即丢弃；填写「改写为」则用捕获组重写 URL（如 <code>$1</code>）。<br>
             正则非法时该条规则会被自动跳过，不会影响其他规则。</p>
         </div>
       </div>
       <table>
         <thead>
           <tr>
-            <th class="col-state">启用</th>
-            <th>正则表达式</th>
-            <th class="col-flag">标志</th>
-            <th class="col-black">黑标丢弃</th>
-            <th class="col-ext">改写为</th>
-            <th class="col-del">操作</th>
+            <th class="col-state" data-i18n="options_th_enable">启用</th>
+            <th data-i18n="options_th_regex">正则表达式</th>
+            <th class="col-flag" data-i18n="options_th_flags">标志</th>
+            <th class="col-black" data-i18n="options_th_black">黑标丢弃</th>
+            <th class="col-ext" data-i18n="options_th_replace">改写为</th>
+            <th class="col-del" data-i18n="options_th_action">操作</th>
           </tr>
         </thead>
         <tbody id="regexBody"></tbody>
       </table>
-      <button class="add-btn" data-add="Regex">+ 添加正则规则</button>
+      <button class="add-btn" data-add="Regex" data-i18n="options_btn_add_regex">+ 添加正则规则</button>
       <div class="test-box">
-        <input type="text" id="testUrl" placeholder="测试 URL，如 https://cdn.example.com/video.mp4?token=1">
-        <button id="testBtn">测试第一条启用的正则</button>
+        <input type="text" id="testUrl" placeholder="测试 URL，如 https://cdn.example.com/video.mp4?token=1" data-i18n-placeholder="options_input_testurl_ph">
+        <button id="testBtn" data-i18n="options_btn_test">测试第一条启用的正则</button>
         <span id="testResult"></span>
       </div>
     </section>
@@ -159,37 +159,37 @@
     <section>
       <div class="sec-head">
         <div>
-          <h2>4. URL 黑白名单（blockUrl）</h2>
-          <p class="hint">按「发起请求的页面 URL」匹配，支持通配符 <code>*</code> 与 <code>?</code>。每行一条。<br>
+          <h2 data-i18n="options_sec_block_title">4. URL 黑白名单（blockUrl）</h2>
+          <p class="hint" data-i18n-html="options_sec_block_hint">按「发起请求的页面 URL」匹配，支持通配符 <code>*</code> 与 <code>?</code>。每行一条。<br>
             黑名单模式：命中的网站<b>不抓取</b>；白名单模式：<b>仅</b>命中的网站抓取。</p>
         </div>
       </div>
       <div class="radio-line">
-        <label><input type="radio" name="blockMode" value="black"> 黑名单（命中的网站不抓取）</label>
-        <label><input type="radio" name="blockMode" value="white"> 白名单（仅命中的网站抓取）</label>
+        <label data-i18n="options_block_black"><input type="radio" name="blockMode" value="black"> 黑名单（命中的网站不抓取）</label>
+        <label data-i18n="options_block_white"><input type="radio" name="blockMode" value="white"> 白名单（仅命中的网站抓取）</label>
       </div>
-      <p class="hint">提示：<b>列表为空时本条规则不生效（始终放行）</b>——切到白名单模式但还没填条目时，不会出现「什么都抓不到」的情况。</p>
-      <textarea id="blockList" placeholder="每行一条，例如：&#10;*://*.example.com/*&#10;https://www.bilibili.com/*"></textarea>
+      <p class="hint" data-i18n-html="options_block_hint2">提示：<b>列表为空时本条规则不生效（始终放行）</b>——切到白名单模式但还没填条目时，不会出现「什么都抓不到」的情况。</p>
+      <textarea id="blockList" placeholder="每行一条，例如：&#10;*://*.example.com/*&#10;https://www.bilibili.com/*" data-i18n-placeholder="options_input_blocklist_ph"></textarea>
     </section>
 
     <section>
       <div class="sec-head">
         <div>
-          <h2>5. 下载设置</h2>
-          <p class="hint">控制下载行为（保存在本地存储，不随账号同步）。</p>
+          <h2 data-i18n="options_sec_download_title">5. 下载设置</h2>
+          <p class="hint" data-i18n="options_sec_download_hint">控制下载行为（保存在本地存储，不随账号同步）。</p>
         </div>
       </div>
       <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;">
         <input type="checkbox" id="saveAsPref" style="margin-top:3px;">
-        <span>下载时弹出「另存为」对话框<br>
+        <span data-i18n-html="options_download_saveas_label">下载时弹出「另存为」对话框<br>
           <span class="hint">默认<b>关闭</b>：直接保存到浏览器默认下载目录（批量下载更顺畅）。开启后每次下载都会询问保存位置。</span>
         </span>
       </label>
 
       <div style="margin-top:16px;">
-        <label style="font-size:13px;font-weight:600;">下载文件名模板（留空 = 保持原文件名）</label>
-        <input type="text" id="fileNameTemplate" placeholder="例：${title}/${fileName}.${ext}" style="margin-top:6px;">
-        <p class="hint" style="margin-top:5px;">
+        <label style="font-size:13px;font-weight:600;" data-i18n="options_label_filename_template">下载文件名模板（留空 = 保持原文件名）</label>
+        <input type="text" id="fileNameTemplate" placeholder="例：${title}/${fileName}.${ext}" style="margin-top:6px;" data-i18n-placeholder="options_input_template_ph">
+        <p class="hint" style="margin-top:5px;" data-i18n-html="options_template_hint">
           可用变量：<code>${title}</code> 页面标题 · <code>${ext}</code> 扩展名 · <code>${date}</code> 日期 ·
           <code>${time}</code> 时间 · <code>${fileName}</code> 原文件名 · <code>${host}</code> 域名 · <code>${type}</code> 类型<br>
           支持子目录（如 <code>${title}/${fileName}.${ext}</code>，会自动建文件夹）。
@@ -197,9 +197,9 @@
       </div>
 
       <div style="margin-top:16px;">
-        <label style="font-size:13px;font-weight:600;">aria2 RPC 地址（留空 = 不启用「发送到 aria2」按钮）</label>
-        <input type="text" id="aria2Rpc" placeholder="http://127.0.0.1:6800/jsonrpc" style="margin-top:6px;">
-        <p class="hint" style="margin-top:5px;">
+        <label style="font-size:13px;font-weight:600;" data-i18n="options_label_aria2">aria2 RPC 地址（留空 = 不启用「发送到 aria2」按钮）</label>
+        <input type="text" id="aria2Rpc" placeholder="http://127.0.0.1:6800/jsonrpc" style="margin-top:6px;" data-i18n-placeholder="options_input_aria2_ph">
+        <p class="hint" style="margin-top:5px;" data-i18n-html="options_aria2_hint">
           若 aria2 配了密钥（<code>--rpc-secret</code>），写成
           <code>http://127.0.0.1:6800/jsonrpc?token=你的密钥</code>。发送时会自动透传 Referer 与已捕获的鉴权头。
         </p>
@@ -208,11 +208,12 @@
   </main>
 
   <footer>
-    <button class="primary" id="save">保存设置</button>
-    <button class="danger" id="reset">清空全部规则（恢复默认）</button>
+    <button class="primary" id="save" data-i18n="options_btn_save">保存设置</button>
+    <button class="danger" id="reset" data-i18n="options_btn_reset">清空全部规则（恢复默认）</button>
     <span id="status"></span>
   </footer>
 
+  <script src="js/i18n.js"></script>
   <script src="js/options.js"></script>
 </body>
 </html>

@@ -12,6 +12,8 @@
  * 自诊断：Referer 注入状态显示在页面上；下载按「原始 Referer →
  *   bilibili 主页 → 无 Referer」逐级重试；内容嗅探防止把 403 错误页
  *   存成 .htm，失败时明确报告 HTTP 状态。
+ * ------------------------------------------------------------
+ * 国际化：所有用户可见文案统一走 t(key, '中文兜底')（i18n.js 提供）。
  * ============================================================
  */
 
@@ -111,18 +113,18 @@ function failCard(msg) {
   stage.innerHTML = `
     <div class="card">
       <div class="warn">⚠ ${msg}</div>
-      <div class="hint">可能原因：CDN 强校验 Referer / 链接带时效签名已过期 / DRM 加密</div>
+      <div class="hint">${t('viewer_fail_reason', '可能原因：CDN 强校验 Referer / 链接带时效签名已过期 / DRM 加密')}</div>
       <div class="actions" style="margin-top:14px;">
-        <button class="ghost" id="copyBtn">复制链接</button>
-        <button id="dlBtn">重新尝试下载</button>
-        <button class="ghost" id="rawBtn">直接打开原始地址</button>
+        <button class="ghost" id="copyBtn">${t('viewer_btn_copy', '复制链接')}</button>
+        <button id="dlBtn">${t('viewer_btn_retry_download', '重新尝试下载')}</button>
+        <button class="ghost" id="rawBtn">${t('viewer_btn_raw', '直接打开原始地址')}</button>
       </div>
     </div>`;
   const copyBtn = document.getElementById('copyBtn');
   const dlBtn = document.getElementById('dlBtn');
   const rawBtn = document.getElementById('rawBtn');
   if (copyBtn) copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(src).then(() => setTextOn(copyBtn, '已复制'));
+    navigator.clipboard.writeText(src).then(() => setTextOn(copyBtn, t('common_copied', '已复制')));
   });
   if (dlBtn) dlBtn.addEventListener('click', () => downloadViaBlob());
   if (rawBtn) rawBtn.addEventListener('click', () => chrome.tabs.create({ url: src }));
@@ -141,14 +143,14 @@ function looksLikeHtml(firstBytes) {
  */
 async function fetchMediaWithRetry(onProgress) {
   const attempts = [];
-  if (ref) attempts.push({ label: '原始页面 Referer', value: ref });
-  attempts.push({ label: 'bilibili 主页 Referer', value: 'https://www.bilibili.com/' });
-  attempts.push({ label: '无 Referer', value: '' });
+  if (ref) attempts.push({ label: t('viewer_ref_original', '原始页面 Referer'), value: ref });
+  attempts.push({ label: t('viewer_ref_bilibili', 'bilibili 主页 Referer'), value: 'https://www.bilibili.com/' });
+  attempts.push({ label: t('viewer_ref_none', '无 Referer'), value: '' });
 
   let lastStatus = 0;
   let lastLabel = '';
   for (const attempt of attempts) {
-    onProgress('尝试 ' + attempt.label + '…');
+    onProgress(t('viewer_trying', '尝试 $1…', [attempt.label]));
     const injected = await applyRefererRule(attempt.value);
     refInjected = injected;
     updateDiag();
@@ -173,7 +175,7 @@ async function fetchMediaWithRetry(onProgress) {
     }
     return { resp, reader, first, via: attempt.label };
   }
-  throw new Error('HTTP ' + lastStatus + '（' + lastLabel + ' 也被 CDN 拒绝）');
+  throw new Error(t('viewer_err_http_failed', 'HTTP $1（$2 也被 CDN 拒绝）', [lastStatus, lastLabel]));
 }
 
 // 根据扩展名推断正确的 MIME（Blob 带上正确类型后，
@@ -195,17 +197,17 @@ async function downloadViaBlob() {
   const statusEl = getOrCreateStatusEl();
   const setTxt = (t) => setTextOn(statusEl, t);
   try {
-    setTxt('连接中…');
+    setTxt(t('viewer_dl_connecting', '连接中…'));
     const res = await fetchMediaWithRetry(setTxt);
-    setTxt('下载中…');
+    setTxt(t('viewer_dl_downloading', '下载中…'));
     const total = parseInt(res.resp.headers.get('content-length') || '0', 10);
     const chunks = [];
     let got = 0;
     const push = (v) => {
       chunks.push(v);
       got += v.length;
-      if (total > 0) setTxt('下载中 ' + Math.round((got / total) * 100) + '%');
-      else setTxt('下载中 ' + (got / 1048576).toFixed(1) + 'MB');
+      if (total > 0) setTxt(t('viewer_dl_progress_pct', '下载中 $1%', [Math.round((got / total) * 100)]));
+      else setTxt(t('viewer_dl_progress_mb', '下载中 $1MB', [(got / 1048576).toFixed(1)]));
     };
     push(res.first.value);
     for (;;) {
@@ -213,7 +215,7 @@ async function downloadViaBlob() {
       if (done) break;
       push(value);
     }
-    setTxt('准备保存…');
+    setTxt(t('viewer_dl_preparing', '准备保存…'));
     // Blob 必须带正确 MIME：空类型会被 Chromium 内容嗅探，
     // 另存时扩展名被改成 .txt/.htm（修复历史 BUG）
     const blobType = (/^(video|audio)\//i.test(mime) ? mime : '') || guessMimeFromPath(path);
@@ -225,11 +227,11 @@ async function downloadViaBlob() {
       // blob URL 延迟回收：等待用户在另存对话框确认 / 下载完成
       setTimeout(() => URL.revokeObjectURL(objUrl), 10 * 60 * 1000);
     });
-    setTxt('已发起保存 ✓');
-    setTimeout(() => { setTxt('下载保存'); }, 2500);
+    setTxt(t('viewer_dl_started', '已发起保存 ✓'));
+    setTimeout(() => { setTxt(t('viewer_dl_save_label', '下载保存')); }, 2500);
   } catch (e) {
-    setTxt('下载失败');
-    failCard('下载失败：' + String(e && e.message || e));
+    setTxt(t('viewer_dl_failed', '下载失败'));
+    failCard(t('viewer_err_download', '下载失败：$1', [String(e && e.message || e)]));
   }
 }
 
@@ -248,11 +250,12 @@ function setupMediaControls(mediaEl) {
 
   const speedBtn = document.getElementById('speedBtn');
   if (speedBtn) {
+    speedBtn.textContent = t('viewer_btn_speed', '倍速 $1×', [SPEED_STEPS[speedIdx]]);
     speedBtn.addEventListener('click', () => {
       speedIdx = (speedIdx + 1) % SPEED_STEPS.length;
       const rate = SPEED_STEPS[speedIdx];
       try { mediaEl.playbackRate = rate; } catch (e) { /* ignore */ }
-      speedBtn.textContent = '倍速 ' + rate + '×';
+      speedBtn.textContent = t('viewer_btn_speed', '倍速 $1×', [rate]);
     });
   }
 
@@ -276,26 +279,26 @@ function setupMediaControls(mediaEl) {
       shotBtn.style.display = 'none';
     } else {
       shotBtn.addEventListener('click', () => {
-        const restore = () => setTimeout(() => { shotBtn.textContent = '截图'; }, 1800);
+        const restore = () => setTimeout(() => { shotBtn.textContent = t('viewer_btn_shot', '截图'); }, 1800);
         try {
           const c = document.createElement('canvas');
           c.width = mediaEl.videoWidth || 0;
           c.height = mediaEl.videoHeight || 0;
-          if (!c.width || !c.height) { shotBtn.textContent = '暂无画面'; restore(); return; }
+          if (!c.width || !c.height) { shotBtn.textContent = t('viewer_shot_none', '暂无画面'); restore(); return; }
           c.getContext('2d').drawImage(mediaEl, 0, 0, c.width, c.height);
           c.toBlob((blob) => {
-            if (!blob) { shotBtn.textContent = '截图失败（跨域限制）'; restore(); return; }
+            if (!blob) { shotBtn.textContent = t('viewer_shot_failed', '截图失败（跨域限制）'); restore(); return; }
             const objUrl = URL.createObjectURL(blob);
             const base = safeName(name).replace(/\.[^.]*$/, '') || 'shot';
             chrome.downloads.download({ url: objUrl, filename: base + '_' + Date.now() + '.png', saveAs: false }, () => {
               setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
             });
-            shotBtn.textContent = '已保存';
+            shotBtn.textContent = t('viewer_shot_saved', '已保存');
             restore();
           }, 'image/png');
         } catch (e) {
           // 跨域视频会污染 canvas，toBlob/drawImage 抛 SecurityError —— 友好降级
-          shotBtn.textContent = '截图失败（跨域限制）';
+          shotBtn.textContent = t('viewer_shot_failed', '截图失败（跨域限制）');
           restore();
         }
       });
@@ -308,8 +311,8 @@ function updateDiag() {
   const el = document.getElementById('diag');
   if (!el) return;
   el.textContent = refInjected
-    ? '防盗链 Referer 注入：已生效'
-    : '防盗链 Referer 注入：未生效（CDN 可能拒绝）';
+    ? t('viewer_diag_injected', '防盗链 Referer 注入：已生效')
+    : t('viewer_diag_not_injected', '防盗链 Referer 注入：未生效（CDN 可能拒绝）');
   el.style.color = refInjected ? '#34d399' : '#fbbf24';
 }
 
@@ -323,7 +326,7 @@ async function init() {
   setTextOn(urlEl, src);
 
   if (!/^https?:/i.test(src)) {
-    failCard('无效的媒体地址');
+    failCard(t('viewer_err_invalid_url', '无效的媒体地址'));
     return;
   }
 
@@ -353,7 +356,7 @@ async function init() {
     v.referrerPolicy = 'no-referrer';
     v.src = src;
     v.addEventListener('error', () => {
-      failCard('播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）');
+      failCard(t('viewer_err_playback', '播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）'));
     });
     stage.appendChild(v);
     setupMediaControls(v);   // 媒体控制条（P2-5：倍速/画中画/截图）
@@ -363,7 +366,7 @@ async function init() {
     a.autoplay = !autoDl;
     a.src = src;
     a.addEventListener('error', () => {
-      failCard('播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）');
+      failCard(t('viewer_err_playback', '播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）'));
     });
     stage.appendChild(a);
     setupMediaControls(a);   // 媒体控制条（P2-5：倍速；视频专属项自动隐藏）
@@ -372,11 +375,11 @@ async function init() {
     img.referrerPolicy = 'no-referrer';
     img.alt = safeName(name);
     img.src = src;
-    img.addEventListener('error', () => failCard('图片加载失败'));
+    img.addEventListener('error', () => failCard(t('viewer_err_image', '图片加载失败')));
     stage.appendChild(img);
   } else {
     // 无法直接内嵌播放的类型（如 m3u8/ts/未知）：展示信息卡 + 操作入口
-    failCard('该类型无法直接内嵌预览（如 m3u8/ts 流或未识别格式）');
+    failCard(t('viewer_err_unsupported', '该类型无法直接内嵌预览（如 m3u8/ts 流或未识别格式）'));
   }
 
   if (autoDl) downloadViaBlob();

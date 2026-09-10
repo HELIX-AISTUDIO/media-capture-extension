@@ -14,6 +14,8 @@
  *   Type[]:    { type, operator, size, unit, state }
  *   Regex[]:   { regex, type(标志), blackList, replaceTo, state }
  *   blockUrl:  { list: string[], white: boolean }
+ * ------------------------------------------------------------
+ * 国际化：所有用户可见文案统一走 t(key, '中文兜底')（i18n.js 提供）。
  * ============================================================
  */
 
@@ -78,7 +80,7 @@ function normalize(incoming) {
 function renderExt() {
   const tb = $('extBody');
   if (!rules.Ext.length) {
-    tb.innerHTML = '<tr class="empty-row"><td colspan="6">暂无规则。留空表示沿用默认逻辑（扩展名白名单 + 内置尺寸阈值）。</td></tr>';
+    tb.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(t('options_empty_ext', '暂无规则。留空表示沿用默认逻辑（扩展名白名单 + 内置尺寸阈值）。')) + '</td></tr>';
     return;
   }
   tb.innerHTML = rules.Ext.map((r, i) => `
@@ -86,16 +88,16 @@ function renderExt() {
       <td class="col-state"><input type="checkbox" data-field="state" ${r.state ? 'checked' : ''}></td>
       <td><input type="text" data-field="ext" value="${escapeHtml(r.ext)}" placeholder="mp4"></td>
       <td><select data-field="operator">${optionsHtml(OPS, r.operator)}</select></td>
-      <td><input type="text" data-field="size" value="${escapeHtml(r.size)}" placeholder="500 或 500-1000"></td>
+      <td><input type="text" data-field="size" value="${escapeHtml(r.size)}" placeholder="${escapeHtml(t('options_ph_size', '500 或 500-1000'))}"></td>
       <td><select data-field="unit">${optionsHtml(UNITS, r.unit)}</select></td>
-      <td class="col-del"><button class="row-del danger" data-del="Ext" data-idx="${i}">删除</button></td>
+      <td class="col-del"><button class="row-del danger" data-del="Ext" data-idx="${i}">${escapeHtml(t('options_btn_del_row', '删除'))}</button></td>
     </tr>`).join('');
 }
 
 function renderType() {
   const tb = $('typeBody');
   if (!rules.Type.length) {
-    tb.innerHTML = '<tr class="empty-row"><td colspan="6">暂无规则。留空表示沿用默认逻辑（content-type 校验 + 内置尺寸阈值）。</td></tr>';
+    tb.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(t('options_empty_type', '暂无规则。留空表示沿用默认逻辑（content-type 校验 + 内置尺寸阈值）。')) + '</td></tr>';
     return;
   }
   tb.innerHTML = rules.Type.map((r, i) => `
@@ -103,16 +105,16 @@ function renderType() {
       <td class="col-state"><input type="checkbox" data-field="state" ${r.state ? 'checked' : ''}></td>
       <td><input type="text" data-field="type" value="${escapeHtml(r.type)}" placeholder="video/*"></td>
       <td><select data-field="operator">${optionsHtml(OPS, r.operator)}</select></td>
-      <td><input type="text" data-field="size" value="${escapeHtml(r.size)}" placeholder="500 或 500-1000"></td>
+      <td><input type="text" data-field="size" value="${escapeHtml(r.size)}" placeholder="${escapeHtml(t('options_ph_size', '500 或 500-1000'))}"></td>
       <td><select data-field="unit">${optionsHtml(UNITS, r.unit)}</select></td>
-      <td class="col-del"><button class="row-del danger" data-del="Type" data-idx="${i}">删除</button></td>
+      <td class="col-del"><button class="row-del danger" data-del="Type" data-idx="${i}">${escapeHtml(t('options_btn_del_row', '删除'))}</button></td>
     </tr>`).join('');
 }
 
 function renderRegex() {
   const tb = $('regexBody');
   if (!rules.Regex.length) {
-    tb.innerHTML = '<tr class="empty-row"><td colspan="6">暂无规则。留空表示不启用任何自定义正则（不影响原有过滤逻辑）。</td></tr>';
+    tb.innerHTML = '<tr class="empty-row"><td colspan="6">' + escapeHtml(t('options_empty_regex', '暂无规则。留空表示不启用任何自定义正则（不影响原有过滤逻辑）。')) + '</td></tr>';
     return;
   }
   tb.innerHTML = rules.Regex.map((r, i) => `
@@ -122,7 +124,7 @@ function renderRegex() {
       <td><input type="text" data-field="type" value="${escapeHtml(r.type)}" placeholder="i"></td>
       <td class="col-black"><input type="checkbox" data-field="blackList" ${r.blackList ? 'checked' : ''}></td>
       <td><input type="text" data-field="replaceTo" value="${escapeHtml(r.replaceTo)}" placeholder="$1"></td>
-      <td class="col-del"><button class="row-del danger" data-del="Regex" data-idx="${i}">删除</button></td>
+      <td class="col-del"><button class="row-del danger" data-del="Regex" data-idx="${i}">${escapeHtml(t('options_btn_del_row', '删除'))}</button></td>
     </tr>`).join('');
 }
 
@@ -204,23 +206,23 @@ $('blockList').addEventListener('input', () => {
 $('testBtn').addEventListener('click', () => {
   const url = $('testUrl').value.trim();
   const res = $('testResult');
-  if (!url) { res.textContent = '请输入测试 URL'; res.style.color = '#b45309'; return; }
+  if (!url) { res.textContent = t('options_test_no_url', '请输入测试 URL'); res.style.color = '#b45309'; return; }
   const enabled = rules.Regex.filter((r) => r.state !== false && String(r.regex || '').trim());
-  if (!enabled.length) { res.textContent = '没有启用且已填写正则的规则'; res.style.color = '#6b7280'; return; }
+  if (!enabled.length) { res.textContent = t('options_test_no_rule', '没有启用且已填写正则的规则'); res.style.color = '#6b7280'; return; }
   const r = enabled[0];
   try {
     const re = new RegExp(r.regex, r.type || '');
     const m = re.exec(url);
-    if (!m) { res.textContent = '未命中（第一条启用规则）'; res.style.color = '#6b7280'; return; }
-    let msg = '命中：' + m[0];
-    if (r.blackList) msg += ' → 该资源会被丢弃';
+    if (!m) { res.textContent = t('options_test_no_match', '未命中（第一条启用规则）'); res.style.color = '#6b7280'; return; }
+    let msg = t('options_test_hit', '命中：$1', [m[0]]);
+    if (r.blackList) msg += t('options_test_discarded', ' → 该资源会被丢弃');
     if (r.replaceTo) {
-      try { msg += ' → 改写为：' + url.replace(re, r.replaceTo); } catch (e) { /* ignore */ }
+      try { msg += t('options_test_rewrite', ' → 改写为：$1', [url.replace(re, r.replaceTo)]); } catch (e) { /* ignore */ }
     }
     res.textContent = msg;
     res.style.color = '#059669';
   } catch (e) {
-    res.textContent = '正则非法：' + String(e && e.message || e);
+    res.textContent = t('options_test_invalid', '正则非法：$1', [String(e && e.message || e)]);
     res.style.color = '#b91c1c';
   }
 });
@@ -249,13 +251,13 @@ $('save').addEventListener('click', () => {
   try {
     chrome.storage.sync.set({ userRules: rules }, () => {
       if (chrome.runtime.lastError) {
-        status('保存失败：' + chrome.runtime.lastError.message, true);
+        status(t('options_save_failed', '保存失败：$1', [chrome.runtime.lastError.message]), true);
         return;
       }
-      status('已保存，规则已立即生效', false);
+      status(t('options_save_ok', '已保存，规则已立即生效'), false);
     });
   } catch (e) {
-    status('保存失败：' + String(e && e.message || e), true);
+    status(t('options_save_failed', '保存失败：$1', [String(e && e.message || e)]), true);
   }
 });
 
@@ -264,11 +266,11 @@ $('reset').addEventListener('click', () => {
   renderAll();
   try {
     chrome.storage.sync.set({ userRules: rules }, () => {
-      if (chrome.runtime.lastError) { status('清空失败：' + chrome.runtime.lastError.message, true); return; }
-      status('已清空全部规则，恢复默认行为', false);
+      if (chrome.runtime.lastError) { status(t('options_reset_failed', '清空失败：$1', [chrome.runtime.lastError.message]), true); return; }
+      status(t('options_reset_ok', '已清空全部规则，恢复默认行为'), false);
     });
   } catch (e) {
-    status('清空失败：' + String(e && e.message || e), true);
+    status(t('options_reset_failed', '清空失败：$1', [String(e && e.message || e)]), true);
   }
 });
 
@@ -286,11 +288,11 @@ if (saveAsEl) {
   saveAsEl.addEventListener('change', () => {
     try {
       chrome.storage.local.set({ downloadSaveAs: saveAsEl.checked }, () => {
-        if (chrome.runtime.lastError) { status('保存失败：' + chrome.runtime.lastError.message, true); return; }
-        status('已保存下载设置', false);
+        if (chrome.runtime.lastError) { status(t('options_save_failed', '保存失败：$1', [chrome.runtime.lastError.message]), true); return; }
+        status(t('options_saveas_ok', '已保存下载设置'), false);
       });
     } catch (e) {
-      status('保存失败：' + String(e && e.message || e), true);
+      status(t('options_save_failed', '保存失败：$1', [String(e && e.message || e)]), true);
     }
   });
 }
@@ -312,8 +314,8 @@ if (tplEl) {
   tplEl.addEventListener('change', () => {
     try {
       chrome.storage.local.set({ fileNameTemplate: tplEl.value.trim() }, () => {
-        if (chrome.runtime.lastError) { status('保存失败：' + chrome.runtime.lastError.message, true); return; }
-        status('已保存文件名模板', false);
+        if (chrome.runtime.lastError) { status(t('options_save_failed', '保存失败：$1', [chrome.runtime.lastError.message]), true); return; }
+        status(t('options_tpl_saved', '已保存文件名模板'), false);
       });
     } catch (e) { /* ignore */ }
   });
@@ -323,10 +325,12 @@ if (rpcEl) {
   rpcEl.addEventListener('change', () => {
     try {
       chrome.storage.local.set({ aria2Rpc: rpcEl.value.trim() }, () => {
-        if (chrome.runtime.lastError) { status('保存失败：' + chrome.runtime.lastError.message, true); return; }
-        status('已保存 aria2 配置', false);
+        if (chrome.runtime.lastError) { status(t('options_save_failed', '保存失败：$1', [chrome.runtime.lastError.message]), true); return; }
+        status(t('options_aria2_saved', '已保存 aria2 配置'), false);
       });
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      status(t('options_save_failed', '保存失败：$1', [String(e && e.message || e)]), true);
+    }
   });
 }
 

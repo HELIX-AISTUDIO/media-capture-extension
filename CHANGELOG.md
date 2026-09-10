@@ -4,6 +4,24 @@
 > 分类按版本内容使用 ✨ 新增、🔧 优化、🐛 修复、📝 更新等标签。
 > 每次发布时，请保证：`CHANGELOG.md 版本号 = git tag 版本号 = manifest.json version`。
 
+## v0.3.3 2026-09-10
+
+✨ 新增
+- **国际化 i18n**：支持 `zh_CN`（默认）与 `en` 两种语言，共 **193 条**界面文案
+  - 新增 `_locales/zh_CN/messages.json` + `_locales/en/messages.json`，manifest 增加 `default_locale`，`name`/`description` 改用 `__MSG_*__`
+  - 新增 `js/i18n.js` 本地化器：提供 `t(key, fallback)` 与 `localizeDom()`，支持 `data-i18n` / `data-i18n-title` / `data-i18n-placeholder` / `data-i18n-html` 四种绑定
+  - 语言自动跟随浏览器界面语言；添加新语言只需在 `_locales/` 下新增一个 `messages.json`
+
+🔧 优化（安全设计）
+- **「中文原文即兜底」**：HTML 保留中文原文、JS 用 `t(key,'中文')` 双参调用；**任何 key 缺失时回退到中文原文**，最坏情况只显示中文，**绝不会出现空白或裸 key**
+  - 实测：真实 Chromium 无头渲染三个页面，裸 key 数 = 0、文案丢失 = 0、空元素 = 0
+- 仅 `manifest.json` 的 name/description/default_locale 三处变更；权限、`minimum_chrome_version`、`side_panel`、`options_ui`、`commands` **逐字节未动**
+- HTML 的 id/class/style/结构与 JS 逻辑均未改动（QA 用 git diff 逐行核对：非 i18n 改动行数 = 0）
+
+📝 更新
+- 版本号 0.3.2 → 0.3.3（**无新增权限**）
+- 说明：`js/options.js` 的 aria2 保存异常由「静默忽略」改为「显示保存失败提示」；`js/viewer.js` 倍速按钮新增初始化文案（中文下等价）。两处均为提示增强，不影响功能
+
 ## v0.3.2 2026-09-10
 
 🐛 修复（独立 QA 全量复验发现的 3 个 bug + 3 个边界问题）

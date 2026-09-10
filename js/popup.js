@@ -13,6 +13,8 @@
  *   7. 复制链接 / 下载 / 打开 / 批量复制
  *   8. m3u8/mpd 解析（调用后台 parseM3u8/parseMpd）
  *   9. 预览面板：视频直接播放、图片大图、音频播放
+ * ------------------------------------------------------------
+ * 国际化：所有用户可见文案统一走 t(key, '中文兜底')（i18n.js 提供）。
  * ============================================================
  */
 
@@ -32,17 +34,17 @@ function updatePauseBanner() {
   if (existing) return;
   const el = document.createElement('div');
   el.id = 'pauseBanner';
-  el.textContent = '⏸ 抓取已暂停 — 用右键菜单或快捷键「暂停 / 恢复抓取」可恢复';
+  el.textContent = t('popup_pause_banner', '⏸ 抓取已暂停 — 用右键菜单或快捷键「暂停 / 恢复抓取」可恢复');
   const list = document.getElementById('list');
   if (list && list.parentNode) list.parentNode.insertBefore(el, list);
 }
 
 const TYPE_META = {
-  video: { label: '视频', cls: 'tag-video' },
-  image: { label: '图片', cls: 'tag-image' },
-  audio: { label: '音频', cls: 'tag-audio' },
-  stream: { label: '流媒体', cls: 'tag-stream' },
-  unknown: { label: '未知', cls: 'tag-unknown' }
+  video: { label: t('popup_type_video', '视频'), cls: 'tag-video' },
+  image: { label: t('popup_type_image', '图片'), cls: 'tag-image' },
+  audio: { label: t('popup_type_audio', '音频'), cls: 'tag-audio' },
+  stream: { label: t('popup_type_stream', '流媒体'), cls: 'tag-stream' },
+  unknown: { label: t('popup_type_unknown', '未知'), cls: 'tag-unknown' }
 };
 
 const SOURCE_META = {
@@ -51,7 +53,7 @@ const SOURCE_META = {
 };
 
 function formatSize(bytes) {
-  if (bytes == null || bytes === 0) return '未知';
+  if (bytes == null || bytes === 0) return t('popup_size_unknown', '未知');
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
@@ -279,7 +281,7 @@ function render() {
   document.getElementById('count').textContent = filtered.length ? `(${filtered.length})` : '';
 
   if (filtered.length === 0) {
-    listEl.innerHTML = '<div class="empty">暂无匹配资源。<br>请刷新页面、播放视频或滚动加载图片后重试。<br><br><span style="font-size:11px;">DRM 加密视频 / 直播流 / 平台签名受限视频无法抓取</span></div>';
+    listEl.innerHTML = '<div class="empty">' + escapeHtml(t('popup_empty_title', '暂无匹配资源。')) + '<br>' + escapeHtml(t('popup_empty_hint', '请刷新页面、播放视频或滚动加载图片后重试。')) + '<br><br><span style="font-size:11px;">' + escapeHtml(t('popup_empty_drm', 'DRM 加密视频 / 直播流 / 平台签名受限视频无法抓取')) + '</span></div>';
     return;
   }
 
@@ -288,15 +290,15 @@ function render() {
   let prevGroupTs = null;
 
   listEl.innerHTML = filtered.map((r, idx) => {
-    const baseMeta = r.likelyAudio ? { label: '音频流', cls: 'tag-audio' } : (TYPE_META[r.type] || TYPE_META.unknown);
+    const baseMeta = r.likelyAudio ? { label: t('popup_type_audio_stream', '音频流'), cls: 'tag-audio' } : (TYPE_META[r.type] || TYPE_META.unknown);
     const sMeta = SOURCE_META[r.source] || SOURCE_META.network;
     // 装饰/头像/logo 小图标记：默认模式已被过滤，仅在深度搜索模式出现时显示此标记
     const decorTag = isDecorativeImage(r)
-      ? '<span class="tag tag-decor" title="装饰/头像/logo 小图：默认模式已自动过滤，仅深度搜索模式显示">装饰</span>'
+      ? `<span class="tag tag-decor" title="${escapeHtml(t('popup_decor_title', '装饰/头像/logo 小图：默认模式已自动过滤，仅深度搜索模式显示'))}">${escapeHtml(t('popup_decor_label', '装饰'))}</span>`
       : '';
     // 鉴权头标记：该资源带 Cookie/Authorization 等头，下载/预览将自动携带
     const authTag = (r.requestHeaders && Object.keys(r.requestHeaders).length > 0)
-      ? '<span class="tag tag-auth" title="该资源需要鉴权头（如 Cookie/Authorization），下载/预览将自动携带">🔒 鉴权</span>'
+      ? `<span class="tag tag-auth" title="${escapeHtml(t('popup_auth_title', '该资源需要鉴权头（如 Cookie/Authorization），下载/预览将自动携带'))}">${escapeHtml(t('popup_auth_label', '🔒 鉴权'))}</span>`
       : '';
     const filename = r.filename || (() => {
       try {
@@ -320,7 +322,7 @@ function render() {
         <div class="item-body">
           <div class="item-head">
             <span class="tag ${baseMeta.cls}">${baseMeta.label}</span>
-            <span class="source ${sMeta.cls}" title="来源：${sMeta.label === 'DOM' ? '页面元素/缓存' : '网络请求'}">${sMeta.label}</span>
+            <span class="source ${sMeta.cls}" title="${escapeHtml(t('popup_source_title', '来源：$1', [sMeta.label === 'DOM' ? t('popup_source_dom', '页面元素/缓存') : t('popup_source_net', '网络请求')]))}">${sMeta.label}</span>
             ${decorTag}
             ${authTag}
             <span class="name" title="${escapeHtml(r.url)}">${escapeHtml(filename)}</span>
@@ -329,10 +331,10 @@ function render() {
           </div>
           <div class="url" title="${escapeHtml(r.url)}">${escapeHtml(shortUrl(r.url))} · <span class="host">${escapeHtml(hostOf(r.url))}</span></div>
           <div class="item-actions">
-            <button class="btn btn-copy" data-url="${escapeHtml(r.url)}">复制</button>
-            <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}" title="下载">下载</button>
-            <button class="btn btn-open" data-url="${escapeHtml(r.url)}" title="${(r.type === 'video' || r.type === 'audio') ? '在媒体查看器中查看' : '在新标签页打开'}">打开</button>
-            ${isStream ? `<button class="btn btn-parse" data-url="${escapeHtml(r.url)}" title="解析 m3u8/mpd 分片">解析</button>` : ''}
+            <button class="btn btn-copy" data-url="${escapeHtml(r.url)}">${t('common_copy', '复制')}</button>
+            <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}" title="${escapeHtml(t('common_download', '下载'))}">${t('common_download', '下载')}</button>
+            <button class="btn btn-open" data-url="${escapeHtml(r.url)}" title="${escapeHtml((r.type === 'video' || r.type === 'audio') ? t('popup_open_title_viewer', '在媒体查看器中查看') : t('popup_open_title_tab', '在新标签页打开'))}">${t('common_open', '打开')}</button>
+            ${isStream ? `<button class="btn btn-parse" data-url="${escapeHtml(r.url)}" title="${escapeHtml(t('popup_btn_parse_title', '解析 m3u8/mpd 分片'))}">${t('popup_btn_parse', '解析')}</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -351,8 +353,8 @@ function render() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       navigator.clipboard.writeText(btn.dataset.url).then(() => {
-        btn.textContent = '已复制';
-        setTimeout(() => (btn.textContent = '复制'), 1200);
+        btn.textContent = t('common_copied', '已复制');
+        setTimeout(() => (btn.textContent = t('common_copy', '复制')), 1200);
       });
     });
   });
@@ -417,16 +419,16 @@ function exportFilteredList() {
 // headers 是资源完整鉴权头对象（可为空），供后台 DNR 一并注入 cookie/origin。
 function downloadUrl(btn, url, filename, referer, headers, mime, type, title) {
   btn.disabled = true;
-  btn.textContent = '下载中…';
+  btn.textContent = t('popup_btn_downloading', '下载中…');
   chrome.runtime.sendMessage({ action: 'download', url, filename, referer, headers, mime, type, title }, (resp) => {
     btn.disabled = false;
     if (resp && resp.ok) {
-      btn.textContent = '已发起';
-      setTimeout(() => (btn.textContent = '下载'), 1200);
+      btn.textContent = t('popup_btn_started', '已发起');
+      setTimeout(() => (btn.textContent = t('common_download', '下载')), 1200);
     } else {
-      btn.textContent = '请用「打开」';
-      btn.title = '扩展无法注入 Referer；请点「打开」在新标签页右键另存';
-      setTimeout(() => { btn.textContent = '下载'; btn.title = ''; }, 3000);
+      btn.textContent = t('popup_btn_use_open', '请用「打开」');
+      btn.title = t('popup_download_fallback_title', '扩展无法注入 Referer；请点「打开」在新标签页右键另存');
+      setTimeout(() => { btn.textContent = t('common_download', '下载'); btn.title = ''; }, 3000);
     }
   });
 }
@@ -467,8 +469,8 @@ function buildPreviewMedia(r) {
   const url = escapeHtml(r.url);
   // 防盗链/分片资源：不渲染播放器，展示提示卡（元信息与操作按钮保留）
   if ((r.type === 'video' || r.type === 'audio') && shouldSkipVideoPreview(r)) {
-    return `<div class="preview-media skip">⚠ 预览跳过（浏览器无法直接播放该格式，如 m3u8/ts）<br>
-      <button class="btn btn-viewer" style="margin-top:8px;">在新页面查看</button> 或点「下载」保存</div>`;
+    return `<div class="preview-media skip">${t('popup_preview_skip', '⚠ 预览跳过（浏览器无法直接播放该格式，如 m3u8/ts）')}<br>
+      <button class="btn btn-viewer" style="margin-top:8px;">${t('popup_btn_viewer_new', '在新页面查看')}</button> ${t('popup_preview_or_download', '或点「下载」保存')}</div>`;
   }
   if (r.type === 'video') {
     return `<video class="preview-media" controls autoplay preload="auto" referrerpolicy="no-referrer" src="${url}"></video>`;
@@ -480,9 +482,9 @@ function buildPreviewMedia(r) {
     return `<img class="preview-media image" src="${url}" referrerpolicy="no-referrer" alt="">`;
   }
   if (r.type === 'stream') {
-    return `<div class="preview-media unknown">流媒体描述文件（m3u8/mpd）。<br>点击「解析」查看分片列表。</div>`;
+    return `<div class="preview-media unknown">${t('popup_preview_stream_desc', '流媒体描述文件（m3u8/mpd）。<br>点击「解析」查看分片列表。')}</div>`;
   }
-  return `<div class="preview-media unknown">无法预览该媒体类型</div>`;
+  return `<div class="preview-media unknown">${t('popup_preview_unknown', '无法预览该媒体类型')}</div>`;
 }
 
 // 生成 curl 下载命令：只为实际存在的鉴权头生成 -H；值写入剪贴板由用户自行使用。
@@ -548,18 +550,18 @@ async function showPreview(r, autoParse) {
   })();
 
   const metaParts = [];
-  if (r.likelyAudio) metaParts.push('<span class="preview-warn">⚠ 推测为 B 站音频流</span>');
+  if (r.likelyAudio) metaParts.push(`<span class="preview-warn">${t('popup_preview_warn_bili', '⚠ 推测为 B 站音频流')}</span>`);
   if (r.type === 'video' && /\.m4s(\?|#|$)/i.test(r.url)) {
-    metaParts.push('<span class="preview-warn">⚠ DASH 视频流无音轨（音视频已分离），请用本地 ffmpeg 合并音视频</span>');
+    metaParts.push(`<span class="preview-warn">${t('popup_preview_warn_dash', '⚠ DASH 视频流无音轨（音视频已分离），请用本地 ffmpeg 合并音视频')}</span>`);
   }
   if (r.type === 'stream') {
-    metaParts.push('<span class="preview-warn">⚠ 流媒体：需解析分片后合并</span>');
+    metaParts.push(`<span class="preview-warn">${t('popup_preview_warn_stream', '⚠ 流媒体：需解析分片后合并')}</span>`);
   }
-  metaParts.push(TYPE_META[r.type] ? TYPE_META[r.type].label : '未知');
+  metaParts.push(TYPE_META[r.type] ? TYPE_META[r.type].label : t('popup_type_unknown', '未知'));
   if (r.requestHeaders && Object.keys(r.requestHeaders).length > 0) {
     // 只显示鉴权头「名称」，不显示值（避免明文凭据铺在界面上）
     const hnames = Object.keys(r.requestHeaders).map((k) => k.charAt(0).toUpperCase() + k.slice(1)).join(', ');
-    metaParts.push('🔒 鉴权头: ' + escapeHtml(hnames));
+    metaParts.push(escapeHtml(t('popup_preview_auth_headers', '🔒 鉴权头: $1', [hnames])));
   }
   if (r.mime) metaParts.push(escapeHtml(r.mime));
   metaParts.push(formatSize(r.size));
@@ -568,28 +570,28 @@ async function showPreview(r, autoParse) {
   const meta = metaParts.join(' · ');
 
   const isStream = r.type === 'stream';
-  const parseBtn = isStream ? `<button class="btn btn-parse" id="previewParse" data-url="${escapeHtml(r.url)}">解析分片</button>` : '';
+  const parseBtn = isStream ? `<button class="btn btn-parse" id="previewParse" data-url="${escapeHtml(r.url)}">${t('popup_btn_parse_segments', '解析分片')}</button>` : '';
   // 「复制为 curl」按钮：仅当资源带鉴权头时才显示（否则 curl 与「复制链接」无差别）
   const curlBtn = (r.requestHeaders && Object.keys(r.requestHeaders).length > 0)
-    ? `<button class="btn btn-curl" data-url="${escapeHtml(r.url)}" title="生成带鉴权头的 curl 命令">复制为curl</button>`
+    ? `<button class="btn btn-curl" data-url="${escapeHtml(r.url)}" title="${escapeHtml(t('popup_curl_title', '生成带鉴权头的 curl 命令'))}">${t('popup_btn_curl', '复制为curl')}</button>`
     : '';
   // 「发送到 aria2」按钮（P2-7）：需先在设置页配置 RPC 地址；未配置时点击会提示
-  const aria2Btn = `<button class="btn btn-aria2" data-url="${escapeHtml(r.url)}" title="发送到 aria2（需在设置页配置 RPC 地址与可选密钥）">发送到 aria2</button>`;
+  const aria2Btn = `<button class="btn btn-aria2" data-url="${escapeHtml(r.url)}" title="${escapeHtml(t('popup_aria2_title', '发送到 aria2（需在设置页配置 RPC 地址与可选密钥）'))}">${t('popup_btn_aria2', '发送到 aria2')}</button>`;
 
   overlay.innerHTML = `
     <div class="preview-card">
       <div class="preview-bar">
         <span class="preview-title" title="${escapeHtml(r.url)}">${escapeHtml(filename)}</span>
-        <span class="preview-close" id="previewClose" title="关闭(ESC)">×</span>
+        <span class="preview-close" id="previewClose" title="${escapeHtml(t('popup_close_title', '关闭(ESC)'))}">×</span>
       </div>
       <div class="preview-media-wrap">${buildPreviewMedia(r)}</div>
       <div class="preview-info">
         <div class="preview-meta">${meta}</div>
         <div class="preview-url" title="${escapeHtml(r.url)}">${escapeHtml(r.url)}</div>
         <div class="preview-actions">
-          <button class="btn btn-copy" data-url="${escapeHtml(r.url)}">复制链接</button>
-          <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}">下载</button>
-          <button class="btn btn-open" data-url="${escapeHtml(r.url)}">打开</button>
+          <button class="btn btn-copy" data-url="${escapeHtml(r.url)}">${t('popup_btn_copy_link', '复制链接')}</button>
+          <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}">${t('common_download', '下载')}</button>
+          <button class="btn btn-open" data-url="${escapeHtml(r.url)}">${t('common_open', '打开')}</button>
           ${curlBtn}
           ${aria2Btn}
           ${parseBtn}
@@ -606,8 +608,8 @@ async function showPreview(r, autoParse) {
   if (mediaEl && mediaEl.tagName === 'VIDEO') {
     mediaEl.addEventListener('error', () => {
       const wrap = overlay.querySelector('.preview-media-wrap');
-      if (wrap) wrap.innerHTML = `<div class="preview-media fail">播放失败（CDN 可能校验 Referer 或链接已过期）。<br>
-        <button class="btn btn-viewer" style="margin-top:8px;">在新页面查看</button> 或点「下载」保存</div>`;
+      if (wrap) wrap.innerHTML = `<div class="preview-media fail">${t('popup_preview_fail', '播放失败（CDN 可能校验 Referer 或链接已过期）。')}<br>
+        <button class="btn btn-viewer" style="margin-top:8px;">${t('popup_btn_viewer_new', '在新页面查看')}</button> ${t('popup_preview_or_download', '或点「下载」保存')}</div>`;
       const vb = overlay.querySelector('.btn-viewer');
       if (vb) vb.addEventListener('click', () => { if (previewResource) openViewer(previewResource); });
     });
@@ -626,8 +628,8 @@ async function showPreview(r, autoParse) {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreview(); });
   overlay.querySelector('.btn-copy').addEventListener('click', (e) => {
     navigator.clipboard.writeText(r.url).then(() => {
-      e.target.textContent = '已复制';
-      setTimeout(() => (e.target.textContent = '复制链接'), 1200);
+      e.target.textContent = t('common_copied', '已复制');
+      setTimeout(() => (e.target.textContent = t('popup_btn_copy_link', '复制链接')), 1200);
     });
   });
   overlay.querySelector('.btn-download').addEventListener('click', (e) => {
@@ -647,8 +649,8 @@ async function showPreview(r, autoParse) {
   if (curlBtnEl) {
     curlBtnEl.addEventListener('click', () => {
       navigator.clipboard.writeText(buildCurlCommand(r)).then(() => {
-        curlBtnEl.textContent = '已复制';
-        setTimeout(() => (curlBtnEl.textContent = '复制为curl'), 1200);
+        curlBtnEl.textContent = t('common_copied', '已复制');
+        setTimeout(() => (curlBtnEl.textContent = t('popup_btn_curl', '复制为curl')), 1200);
       });
     });
   }
@@ -674,12 +676,12 @@ async function showPreview(r, autoParse) {
       }, (resp) => {
         aria2BtnEl.disabled = false;
         if (resp && resp.ok) {
-          aria2BtnEl.textContent = '已发送';
+          aria2BtnEl.textContent = t('popup_aria2_sent', '已发送');
         } else {
           const err = resp && resp.error;
-          aria2BtnEl.textContent = (err === 'no_rpc') ? '请先在设置页配置' : '发送失败';
+          aria2BtnEl.textContent = (err === 'no_rpc') ? t('popup_aria2_no_rpc', '请先在设置页配置') : t('popup_aria2_failed', '发送失败');
         }
-        setTimeout(() => { aria2BtnEl.textContent = '发送到 aria2'; }, 2000);
+        setTimeout(() => { aria2BtnEl.textContent = t('popup_btn_aria2', '发送到 aria2'); }, 2000);
       });
     });
   }
@@ -692,13 +694,13 @@ function doParse(r) {
   const resultEl = document.getElementById('parseResult');
   if (!resultEl) return;
   resultEl.style.display = 'block';
-  resultEl.innerHTML = '<div class="parse-head">解析中…</div>';
+  resultEl.innerHTML = '<div class="parse-head">' + escapeHtml(t('popup_parse_parsing', '解析中…')) + '</div>';
   const isMpd = /\.mpd(\?|#|$)/i.test(r.url);
   const action = isMpd ? 'parseMpd' : 'parseM3u8';
 
   chrome.runtime.sendMessage({ action, url: r.url, pageUrl: currentTabUrl }, (resp) => {
     if (!resp || !resp.ok) {
-      resultEl.innerHTML = `<div class="parse-head">解析失败</div><div class="preview-meta">${escapeHtml(resp && resp.message || '未知错误')}<br>可能是 CDN 需要 Referer 或跨域限制。</div>`;
+      resultEl.innerHTML = `<div class="parse-head">${escapeHtml(t('popup_parse_failed', '解析失败'))}</div><div class="preview-meta">${escapeHtml(resp && resp.message || t('popup_parse_unknown_err', '未知错误'))}<br>${escapeHtml(t('popup_parse_failed_hint', '可能是 CDN 需要 Referer 或跨域限制。'))}</div>`;
       return;
     }
     renderParseResult(resultEl, resp.parsed, isMpd);
@@ -738,7 +740,7 @@ function downloadAllSegments(btn, segments, baseName) {
   if (urls.length === 0) return;
   btn.disabled = true;
   const old = btn.textContent;
-  btn.textContent = '已入队 ' + urls.length + ' 个…';
+  btn.textContent = t('popup_seg_queued', '已入队 $1 个…', [urls.length]);
   chrome.runtime.sendMessage({ action: 'downloadSegments', urls, baseName }, () => {
     setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 1600);
   });
@@ -755,15 +757,15 @@ function renderParseResult(el, parsed, isMpd) {
   if (isMpd) {
     const reps = parsed.representations || [];
     const segs = parsed.segments || [];
-    let html = `<div class="parse-head">DASH 轨道（${reps.length} 个）</div>`;
+    let html = `<div class="parse-head">${t('popup_dash_tracks', 'DASH 轨道（$1 个）', [reps.length])}</div>`;
     reps.forEach((rep) => {
       html += `<div class="parse-seg"><span class="idx">${escapeHtml(rep.kind || '')}</span><span class="seg-url">${escapeHtml(rep.mimeType || '')} ${rep.resolution || ''} ${rep.bandwidth ? formatSize(rep.bandwidth * 8) + '/s' : ''}</span></div>`;
     });
-    html += `<div class="parse-head">分片（${segs.length} 个）</div>`;
+    html += `<div class="parse-head">${t('popup_seg_count', '分片（$1 个）', [segs.length])}</div>`;
     segs.slice(0, 50).forEach((s, i) => {
-      html += `<div class="parse-seg"><span class="idx">${i + 1}</span><span class="seg-url" title="${escapeHtml(s.url)}">${escapeHtml(shortUrl(s.url))}</span><span class="seg-copy" data-url="${escapeHtml(s.url)}">复制</span></div>`;
+      html += `<div class="parse-seg"><span class="idx">${i + 1}</span><span class="seg-url" title="${escapeHtml(s.url)}">${escapeHtml(shortUrl(s.url))}</span><span class="seg-copy" data-url="${escapeHtml(s.url)}">${t('common_copy', '复制')}</span></div>`;
     });
-    if (segs.length > 50) html += `<div class="parse-seg">… 仅显示前 50 个分片（共 ${segs.length}）</div>`;
+    if (segs.length > 50) html += `<div class="parse-seg">${t('popup_seg_truncated', '… 仅显示前 50 个分片（共 $1）', [segs.length])}</div>`;
     el.innerHTML = html;
   } else {
     const playlists = parsed.playlists || [];
@@ -771,23 +773,23 @@ function renderParseResult(el, parsed, isMpd) {
     const keys = parsed.keys || [];
     let html = '';
     if (playlists.length > 0) {
-      html += `<div class="parse-head">嵌套播放列表（${playlists.length} 个多码率）</div>`;
+      html += `<div class="parse-head">${t('popup_nested_playlists', '嵌套播放列表（$1 个多码率）', [playlists.length])}</div>`;
       playlists.forEach((p) => {
-        html += `<div class="parse-seg"><span class="idx">${p.resolution || ''}</span><span class="seg-url" title="${escapeHtml(p.url)}">${escapeHtml(shortUrl(p.url))}</span><span class="seg-copy" data-url="${escapeHtml(p.url)}">复制</span></div>`;
+        html += `<div class="parse-seg"><span class="idx">${p.resolution || ''}</span><span class="seg-url" title="${escapeHtml(p.url)}">${escapeHtml(shortUrl(p.url))}</span><span class="seg-copy" data-url="${escapeHtml(p.url)}">${t('common_copy', '复制')}</span></div>`;
       });
     }
     if (keys.length > 0) {
-      html += `<div class="parse-head">加密密钥（${keys.length} 个，仅列出不解密）</div>`;
+      html += `<div class="parse-head">${t('popup_keys_count', '加密密钥（$1 个，仅列出不解密）', [keys.length])}</div>`;
       keys.forEach((k) => {
-        html += `<div class="parse-seg"><span class="idx">${escapeHtml(k.method)}</span><span class="seg-url" title="${escapeHtml(k.uri || '')}">${escapeHtml(shortUrl(k.uri || ''))}</span><span class="seg-copy" data-url="${escapeHtml(k.uri || '')}">复制</span></div>`;
+        html += `<div class="parse-seg"><span class="idx">${escapeHtml(k.method)}</span><span class="seg-url" title="${escapeHtml(k.uri || '')}">${escapeHtml(shortUrl(k.uri || ''))}</span><span class="seg-copy" data-url="${escapeHtml(k.uri || '')}">${t('common_copy', '复制')}</span></div>`;
       });
     }
-    html += `<div class="parse-head">分片（${segs.length} 个）</div>`;
+    html += `<div class="parse-head">${t('popup_seg_count', '分片（$1 个）', [segs.length])}</div>`;
     segs.slice(0, 50).forEach((s, i) => {
-      html += `<div class="parse-seg"><span class="idx">${i + 1}</span><span class="seg-url" title="${escapeHtml(s.url)}">${escapeHtml(shortUrl(s.url))}</span><span class="seg-copy" data-url="${escapeHtml(s.url)}">复制</span></div>`;
+      html += `<div class="parse-seg"><span class="idx">${i + 1}</span><span class="seg-url" title="${escapeHtml(s.url)}">${escapeHtml(shortUrl(s.url))}</span><span class="seg-copy" data-url="${escapeHtml(s.url)}">${t('common_copy', '复制')}</span></div>`;
     });
-    if (segs.length > 50) html += `<div class="parse-seg">… 仅显示前 50 个分片（共 ${segs.length}）</div>`;
-    if (segs.length === 0 && playlists.length === 0) html = '<div class="parse-head">未解析到分片，可能是嵌套 m3u8 或加密流。</div>';
+    if (segs.length > 50) html += `<div class="parse-seg">${t('popup_seg_truncated', '… 仅显示前 50 个分片（共 $1）', [segs.length])}</div>`;
+    if (segs.length === 0 && playlists.length === 0) html = '<div class="parse-head">' + escapeHtml(t('popup_parse_no_segments', '未解析到分片，可能是嵌套 m3u8 或加密流。')) + '</div>';
     el.innerHTML = html;
   }
 
@@ -799,7 +801,7 @@ function renderParseResult(el, parsed, isMpd) {
     if (isM3u8) {
       const bM3u8 = document.createElement('button');
       bM3u8.className = 'btn';
-      bM3u8.textContent = '导出为 .m3u8';
+      bM3u8.textContent = t('popup_btn_export_m3u8', '导出为 .m3u8');
       bM3u8.addEventListener('click', () => {
         saveTextAsFile(buildM3u8Text(allSegs), baseName + '.m3u8', 'application/vnd.apple.mpegurl');
       });
@@ -807,19 +809,19 @@ function renderParseResult(el, parsed, isMpd) {
     }
     const bTxt = document.createElement('button');
     bTxt.className = 'btn';
-    bTxt.textContent = '导出 URL 列表';
+    bTxt.textContent = t('popup_btn_export_urls', '导出 URL 列表');
     bTxt.addEventListener('click', () => {
       saveTextAsFile(allSegs.map((s) => s.url).join('\n'), baseName + '_urls.txt', 'text/plain');
     });
     const bDl = document.createElement('button');
     bDl.className = 'btn';
-    bDl.textContent = '下载全部分片（' + allSegs.length + '）';
+    bDl.textContent = t('popup_btn_download_all_segs', '下载全部分片（$1）', [allSegs.length]);
     bDl.addEventListener('click', () => downloadAllSegments(bDl, allSegs, baseName));
     bar.appendChild(bTxt);
     bar.appendChild(bDl);
     const hint = document.createElement('div');
     hint.className = 'parse-hint';
-    hint.textContent = '仅下载 / 导出分片，不做合并；合并请用本地 ffmpeg / N_m3u8DL。';
+    hint.textContent = t('popup_parse_hint', '仅下载 / 导出分片，不做合并；合并请用本地 ffmpeg / N_m3u8DL。');
     el.appendChild(bar);
     el.appendChild(hint);
   }
@@ -828,8 +830,8 @@ function renderParseResult(el, parsed, isMpd) {
   el.querySelectorAll('.seg-copy').forEach((span) => {
     span.addEventListener('click', () => {
       navigator.clipboard.writeText(span.dataset.url).then(() => {
-        span.textContent = '已复制';
-        setTimeout(() => (span.textContent = '复制'), 1000);
+        span.textContent = t('common_copied', '已复制');
+        setTimeout(() => (span.textContent = t('common_copy', '复制')), 1000);
       });
     });
   });
@@ -891,7 +893,7 @@ function loadCaptureMode() {
 // 清空当前 tab 资源 → 通知 content 重扫 → 重新拉取列表
 async function doFullRefresh() {
   const btn = document.getElementById('refresh');
-  if (btn) { btn.disabled = true; btn.textContent = '刷新中…'; }
+  if (btn) { btn.disabled = true; btn.textContent = t('popup_btn_refreshing', '刷新中…'); }
   try {
     await chrome.runtime.sendMessage({ action: 'clearResources', tabId: currentTabId });
     if (currentTabId) {
@@ -902,7 +904,7 @@ async function doFullRefresh() {
     await new Promise((r) => setTimeout(r, 300));
     await refresh();
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '刷新'; }
+    if (btn) { btn.disabled = false; btn.textContent = t('popup_btn_refresh', '刷新'); }
   }
 }
 
@@ -958,11 +960,11 @@ let autoDownOn = false;
 function applyAutoDownUI() {
   const btn = document.getElementById('autoDown');
   if (!btn) return;
-  btn.textContent = autoDownOn ? '自动下载·开' : '自动下载';
+  btn.textContent = autoDownOn ? t('popup_btn_autodown_on', '自动下载·开') : t('popup_btn_autodown', '自动下载');
   if (autoDownOn) btn.classList.add('active'); else btn.classList.remove('active');
   btn.title = autoDownOn
-    ? '自动下载已开启：本页新抓到的资源会自动下载（点击关闭）'
-    : '开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）';
+    ? t('popup_autodown_on_title', '自动下载已开启：本页新抓到的资源会自动下载（点击关闭）')
+    : t('popup_autodown_off_title', '开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）');
 }
 function loadAutoDown() {
   if (currentTabId == null) return;
@@ -985,8 +987,8 @@ document.getElementById('autoDown').addEventListener('click', () => {
 document.getElementById('export').addEventListener('click', () => {
   const btn = document.getElementById('export');
   const n = exportFilteredList();
-  btn.textContent = n > 0 ? ('已导出 ' + n) : '列表为空';
-  setTimeout(() => { btn.textContent = '导出'; }, 1600);
+  btn.textContent = n > 0 ? t('popup_export_done', '已导出 $1', [n]) : t('popup_export_empty', '列表为空');
+  setTimeout(() => { btn.textContent = t('popup_btn_export', '导出'); }, 1600);
 });
 
 // 批量复制按钮已移除（v0.2.4 精简界面，仅保留刷新/清空）

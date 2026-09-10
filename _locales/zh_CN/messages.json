@@ -1,0 +1,774 @@
+{
+  "ext_name": {
+    "message": "网页媒体抓取器 (Media Catch)",
+    "description": "Extension name"
+  },
+  "ext_desc": {
+    "message": "抓取当前网页中的视频/图片/音频资源(m3u8/mp4/webm/mpd/jpg/png/gif 等),支持 m3u8/DASH 解析、预览、筛选、批量复制与下载。参考猫抓 cat-catch 架构重新工程化实现。",
+    "description": "Extension description"
+  },
+  "common_copied": {
+    "message": "已复制",
+    "description": "Copied state"
+  },
+  "common_copy": {
+    "message": "复制",
+    "description": "Copy button"
+  },
+  "common_download": {
+    "message": "下载",
+    "description": "Download button"
+  },
+  "common_open": {
+    "message": "打开",
+    "description": "Open button"
+  },
+  "popup_title": {
+    "message": "网页媒体抓取器",
+    "description": "Popup title"
+  },
+  "popup_filter_video": {
+    "message": "视频",
+    "description": "Filter: video"
+  },
+  "popup_filter_image": {
+    "message": "图片",
+    "description": "Filter: image"
+  },
+  "popup_filter_audio": {
+    "message": "音频",
+    "description": "Filter: audio"
+  },
+  "popup_btn_refresh": {
+    "message": "刷新",
+    "description": "Refresh button"
+  },
+  "popup_btn_refresh_title": {
+    "message": "重新读取",
+    "description": "Refresh button tooltip"
+  },
+  "popup_btn_clear": {
+    "message": "清空",
+    "description": "Clear button"
+  },
+  "popup_btn_clear_title": {
+    "message": "清空列表",
+    "description": "Clear button tooltip"
+  },
+  "popup_btn_settings": {
+    "message": "设置",
+    "description": "Settings button"
+  },
+  "popup_btn_settings_title": {
+    "message": "规则设置（扩展名/MIME/正则/黑白名单）",
+    "description": "Settings button tooltip"
+  },
+  "popup_btn_autodown": {
+    "message": "自动下载",
+    "description": "Auto download button"
+  },
+  "popup_btn_autodown_title": {
+    "message": "开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）",
+    "description": "Auto download tooltip"
+  },
+  "popup_btn_autodown_on": {
+    "message": "自动下载·开",
+    "description": "Auto download button when on"
+  },
+  "popup_autodown_on_title": {
+    "message": "自动下载已开启：本页新抓到的资源会自动下载（点击关闭）",
+    "description": "Auto download tooltip when on"
+  },
+  "popup_autodown_off_title": {
+    "message": "开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）",
+    "description": "Auto download tooltip when off"
+  },
+  "popup_btn_export": {
+    "message": "导出",
+    "description": "Export button"
+  },
+  "popup_btn_export_title": {
+    "message": "导出当前筛选结果为 URL 列表（.txt，每行一条）",
+    "description": "Export button tooltip"
+  },
+  "popup_input_keyword_ph": {
+    "message": "关键词筛选（文件名/URL/域名）",
+    "description": "Keyword input placeholder"
+  },
+  "popup_input_size_ph": {
+    "message": "大小筛选，如 >100KB 或 500-1000MB",
+    "description": "Size input placeholder"
+  },
+  "popup_select_sort_title": {
+    "message": "排序方式",
+    "description": "Sort select tooltip"
+  },
+  "popup_sort_desc": {
+    "message": "最新置顶",
+    "description": "Sort option desc"
+  },
+  "popup_sort_asc": {
+    "message": "最旧置顶",
+    "description": "Sort option asc"
+  },
+  "popup_sort_size": {
+    "message": "按大小",
+    "description": "Sort option size"
+  },
+  "popup_mode_label": {
+    "message": "抓取模式：",
+    "description": "Capture mode label"
+  },
+  "popup_mode_default": {
+    "message": "默认模式（仅保留视频/音频/图片/流媒体）",
+    "description": "Default capture mode"
+  },
+  "popup_mode_deep": {
+    "message": "深度搜索模式（全部抓取）",
+    "description": "Deep capture mode"
+  },
+  "popup_empty_loading": {
+    "message": "正在读取资源…",
+    "description": "Loading placeholder"
+  },
+  "popup_empty_title": {
+    "message": "暂无匹配资源。",
+    "description": "Empty list title"
+  },
+  "popup_empty_hint": {
+    "message": "请刷新页面、播放视频或滚动加载图片后重试。",
+    "description": "Empty list hint"
+  },
+  "popup_empty_drm": {
+    "message": "DRM 加密视频 / 直播流 / 平台签名受限视频无法抓取",
+    "description": "Empty list DRM hint"
+  },
+  "popup_footer_hint": {
+    "message": "提示：DRM 加密视频无法抓取；DASH 视频流与音轨分离，需用本地 ffmpeg 合并音视频；下载失败请用「打开」在新标签页另存。",
+    "description": "Popup footer hint"
+  },
+  "popup_type_video": {
+    "message": "视频",
+    "description": "Type label video"
+  },
+  "popup_type_image": {
+    "message": "图片",
+    "description": "Type label image"
+  },
+  "popup_type_audio": {
+    "message": "音频",
+    "description": "Type label audio"
+  },
+  "popup_type_stream": {
+    "message": "流媒体",
+    "description": "Type label stream"
+  },
+  "popup_type_unknown": {
+    "message": "未知",
+    "description": "Type label unknown"
+  },
+  "popup_type_audio_stream": {
+    "message": "音频流",
+    "description": "Type label audio stream"
+  },
+  "popup_size_unknown": {
+    "message": "未知",
+    "description": "Unknown size"
+  },
+  "popup_pause_banner": {
+    "message": "⏸ 抓取已暂停 — 用右键菜单或快捷键「暂停 / 恢复抓取」可恢复",
+    "description": "Capture paused banner"
+  },
+  "popup_decor_label": {
+    "message": "装饰",
+    "description": "Decorative tag"
+  },
+  "popup_decor_title": {
+    "message": "装饰/头像/logo 小图：默认模式已自动过滤，仅深度搜索模式显示",
+    "description": "Decorative tag tooltip"
+  },
+  "popup_auth_label": {
+    "message": "🔒 鉴权",
+    "description": "Auth tag"
+  },
+  "popup_auth_title": {
+    "message": "该资源需要鉴权头（如 Cookie/Authorization），下载/预览将自动携带",
+    "description": "Auth tag tooltip"
+  },
+  "popup_source_title": {
+    "message": "来源：$1",
+    "description": "Source badge tooltip"
+  },
+  "popup_source_dom": {
+    "message": "页面元素/缓存",
+    "description": "Source DOM"
+  },
+  "popup_source_net": {
+    "message": "网络请求",
+    "description": "Source network"
+  },
+  "popup_btn_parse": {
+    "message": "解析",
+    "description": "Parse button"
+  },
+  "popup_btn_parse_title": {
+    "message": "解析 m3u8/mpd 分片",
+    "description": "Parse button tooltip"
+  },
+  "popup_open_title_viewer": {
+    "message": "在媒体查看器中查看",
+    "description": "Open in viewer tooltip"
+  },
+  "popup_open_title_tab": {
+    "message": "在新标签页打开",
+    "description": "Open in tab tooltip"
+  },
+  "popup_btn_downloading": {
+    "message": "下载中…",
+    "description": "Download in progress"
+  },
+  "popup_btn_started": {
+    "message": "已发起",
+    "description": "Download started"
+  },
+  "popup_btn_use_open": {
+    "message": "请用「打开」",
+    "description": "Download failed hint"
+  },
+  "popup_download_fallback_title": {
+    "message": "扩展无法注入 Referer；请点「打开」在新标签页右键另存",
+    "description": "Download fallback tooltip"
+  },
+  "popup_preview_skip": {
+    "message": "⚠ 预览跳过（浏览器无法直接播放该格式，如 m3u8/ts）",
+    "description": "Preview skipped"
+  },
+  "popup_btn_viewer_new": {
+    "message": "在新页面查看",
+    "description": "View in new page button"
+  },
+  "popup_preview_or_download": {
+    "message": "或点「下载」保存",
+    "description": "Or download hint"
+  },
+  "popup_preview_stream_desc": {
+    "message": "流媒体描述文件（m3u8/mpd）。<br>点击「解析」查看分片列表。",
+    "description": "Stream preview description"
+  },
+  "popup_preview_unknown": {
+    "message": "无法预览该媒体类型",
+    "description": "Unknown preview"
+  },
+  "popup_preview_warn_bili": {
+    "message": "⚠ 推测为 B 站音频流",
+    "description": "Preview warn bilibili"
+  },
+  "popup_preview_warn_dash": {
+    "message": "⚠ DASH 视频流无音轨（音视频已分离），请用本地 ffmpeg 合并音视频",
+    "description": "Preview warn DASH"
+  },
+  "popup_preview_warn_stream": {
+    "message": "⚠ 流媒体：需解析分片后合并",
+    "description": "Preview warn stream"
+  },
+  "popup_preview_auth_headers": {
+    "message": "🔒 鉴权头: $1",
+    "description": "Preview auth headers"
+  },
+  "popup_btn_parse_segments": {
+    "message": "解析分片",
+    "description": "Parse segments button"
+  },
+  "popup_btn_curl": {
+    "message": "复制为curl",
+    "description": "Copy as curl button"
+  },
+  "popup_curl_title": {
+    "message": "生成带鉴权头的 curl 命令",
+    "description": "Copy as curl tooltip"
+  },
+  "popup_btn_aria2": {
+    "message": "发送到 aria2",
+    "description": "Send to aria2 button"
+  },
+  "popup_aria2_title": {
+    "message": "发送到 aria2（需在设置页配置 RPC 地址与可选密钥）",
+    "description": "Send to aria2 tooltip"
+  },
+  "popup_close_title": {
+    "message": "关闭(ESC)",
+    "description": "Preview close tooltip"
+  },
+  "popup_btn_copy_link": {
+    "message": "复制链接",
+    "description": "Copy link button"
+  },
+  "popup_preview_fail": {
+    "message": "播放失败（CDN 可能校验 Referer 或链接已过期）。",
+    "description": "Preview playback failed"
+  },
+  "popup_aria2_sent": {
+    "message": "已发送",
+    "description": "Aria2 sent"
+  },
+  "popup_aria2_no_rpc": {
+    "message": "请先在设置页配置",
+    "description": "Aria2 no rpc"
+  },
+  "popup_aria2_failed": {
+    "message": "发送失败",
+    "description": "Aria2 send failed"
+  },
+  "popup_parse_parsing": {
+    "message": "解析中…",
+    "description": "Parsing"
+  },
+  "popup_parse_failed": {
+    "message": "解析失败",
+    "description": "Parse failed"
+  },
+  "popup_parse_unknown_err": {
+    "message": "未知错误",
+    "description": "Unknown error"
+  },
+  "popup_parse_failed_hint": {
+    "message": "可能是 CDN 需要 Referer 或跨域限制。",
+    "description": "Parse failed hint"
+  },
+  "popup_parse_no_segments": {
+    "message": "未解析到分片，可能是嵌套 m3u8 或加密流。",
+    "description": "No segments"
+  },
+  "popup_dash_tracks": {
+    "message": "DASH 轨道（$1 个）",
+    "description": "DASH tracks count"
+  },
+  "popup_seg_count": {
+    "message": "分片（$1 个）",
+    "description": "Segment count"
+  },
+  "popup_seg_truncated": {
+    "message": "… 仅显示前 50 个分片（共 $1）",
+    "description": "Segments truncated"
+  },
+  "popup_nested_playlists": {
+    "message": "嵌套播放列表（$1 个多码率）",
+    "description": "Nested playlists"
+  },
+  "popup_keys_count": {
+    "message": "加密密钥（$1 个，仅列出不解密）",
+    "description": "Keys count"
+  },
+  "popup_btn_export_m3u8": {
+    "message": "导出为 .m3u8",
+    "description": "Export m3u8 button"
+  },
+  "popup_btn_export_urls": {
+    "message": "导出 URL 列表",
+    "description": "Export URLs button"
+  },
+  "popup_btn_download_all_segs": {
+    "message": "下载全部分片（$1）",
+    "description": "Download all segments"
+  },
+  "popup_parse_hint": {
+    "message": "仅下载 / 导出分片，不做合并；合并请用本地 ffmpeg / N_m3u8DL。",
+    "description": "Parse hint"
+  },
+  "popup_seg_queued": {
+    "message": "已入队 $1 个…",
+    "description": "Segments queued"
+  },
+  "popup_btn_refreshing": {
+    "message": "刷新中…",
+    "description": "Refreshing"
+  },
+  "popup_export_done": {
+    "message": "已导出 $1",
+    "description": "Export done"
+  },
+  "popup_export_empty": {
+    "message": "列表为空",
+    "description": "Export empty"
+  },
+  "viewer_title": {
+    "message": "媒体查看器",
+    "description": "Viewer title"
+  },
+  "viewer_btn_speed": {
+    "message": "倍速 $1×",
+    "description": "Playback speed button"
+  },
+  "viewer_btn_speed_title": {
+    "message": "循环切换播放倍速",
+    "description": "Speed button tooltip"
+  },
+  "viewer_btn_pip": {
+    "message": "画中画",
+    "description": "PiP button"
+  },
+  "viewer_btn_pip_title": {
+    "message": "画中画（小窗悬浮播放）",
+    "description": "PiP button tooltip"
+  },
+  "viewer_btn_shot": {
+    "message": "截图",
+    "description": "Screenshot button"
+  },
+  "viewer_btn_shot_title": {
+    "message": "截取当前画面（跨域视频可能因版权保护而失败）",
+    "description": "Screenshot button tooltip"
+  },
+  "viewer_fail_reason": {
+    "message": "可能原因：CDN 强校验 Referer / 链接带时效签名已过期 / DRM 加密",
+    "description": "Fail card reason"
+  },
+  "viewer_btn_copy": {
+    "message": "复制链接",
+    "description": "Copy link button"
+  },
+  "viewer_btn_retry_download": {
+    "message": "重新尝试下载",
+    "description": "Retry download button"
+  },
+  "viewer_btn_raw": {
+    "message": "直接打开原始地址",
+    "description": "Open raw URL button"
+  },
+  "viewer_err_invalid_url": {
+    "message": "无效的媒体地址",
+    "description": "Invalid URL error"
+  },
+  "viewer_err_playback": {
+    "message": "播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）",
+    "description": "Playback error"
+  },
+  "viewer_err_image": {
+    "message": "图片加载失败",
+    "description": "Image error"
+  },
+  "viewer_err_unsupported": {
+    "message": "该类型无法直接内嵌预览（如 m3u8/ts 流或未识别格式）",
+    "description": "Unsupported type"
+  },
+  "viewer_err_download": {
+    "message": "下载失败：$1",
+    "description": "Download error"
+  },
+  "viewer_ref_original": {
+    "message": "原始页面 Referer",
+    "description": "Attempt label original referer"
+  },
+  "viewer_ref_bilibili": {
+    "message": "bilibili 主页 Referer",
+    "description": "Attempt label bilibili referer"
+  },
+  "viewer_ref_none": {
+    "message": "无 Referer",
+    "description": "Attempt label no referer"
+  },
+  "viewer_trying": {
+    "message": "尝试 $1…",
+    "description": "Trying attempt"
+  },
+  "viewer_err_http_failed": {
+    "message": "HTTP $1（$2 也被 CDN 拒绝）",
+    "description": "HTTP failure"
+  },
+  "viewer_dl_connecting": {
+    "message": "连接中…",
+    "description": "Download connecting"
+  },
+  "viewer_dl_downloading": {
+    "message": "下载中…",
+    "description": "Download downloading"
+  },
+  "viewer_dl_progress_pct": {
+    "message": "下载中 $1%",
+    "description": "Download progress percent"
+  },
+  "viewer_dl_progress_mb": {
+    "message": "下载中 $1MB",
+    "description": "Download progress MB"
+  },
+  "viewer_dl_preparing": {
+    "message": "准备保存…",
+    "description": "Preparing save"
+  },
+  "viewer_dl_started": {
+    "message": "已发起保存 ✓",
+    "description": "Save started"
+  },
+  "viewer_dl_save_label": {
+    "message": "下载保存",
+    "description": "Download save label"
+  },
+  "viewer_dl_failed": {
+    "message": "下载失败",
+    "description": "Download failed"
+  },
+  "viewer_diag_injected": {
+    "message": "防盗链 Referer 注入：已生效",
+    "description": "Diag injected"
+  },
+  "viewer_diag_not_injected": {
+    "message": "防盗链 Referer 注入：未生效（CDN 可能拒绝）",
+    "description": "Diag not injected"
+  },
+  "viewer_shot_none": {
+    "message": "暂无画面",
+    "description": "Screenshot no frame"
+  },
+  "viewer_shot_failed": {
+    "message": "截图失败（跨域限制）",
+    "description": "Screenshot failed"
+  },
+  "viewer_shot_saved": {
+    "message": "已保存",
+    "description": "Screenshot saved"
+  },
+  "options_title": {
+    "message": "网页媒体抓取器 · 规则设置",
+    "description": "Options title"
+  },
+  "options_h1": {
+    "message": "网页媒体抓取器 · 规则设置",
+    "description": "Options h1"
+  },
+  "options_header_hint": {
+    "message": "规则保存在浏览器<b>同步存储</b>（storage.sync），保存后立即生效，无需重载扩展。<br><span class=\"safe\">安全承诺：四张表全部留空 = 与默认行为完全一致</span>——未配置的用户不会误伤、误删任何资源。",
+    "description": "Options header hint"
+  },
+  "options_sec_ext_title": {
+    "message": "1. 扩展名规则（Ext）",
+    "description": "Section ext title"
+  },
+  "options_sec_ext_hint": {
+    "message": "按资源扩展名精确匹配。命中后按「运算符 + 尺寸」判定：满足则保留，不满足则丢弃。<br>例：扩展名 <code>mp4</code>、运算符 <code>&gt;=</code>、尺寸 <code>500</code> KB → 小于 500KB 的 mp4 一律不抓。",
+    "description": "Section ext hint"
+  },
+  "options_th_enable": {
+    "message": "启用",
+    "description": "Table header enable"
+  },
+  "options_th_ext": {
+    "message": "扩展名（不含点）",
+    "description": "Table header ext"
+  },
+  "options_th_operator": {
+    "message": "运算符",
+    "description": "Table header operator"
+  },
+  "options_th_size": {
+    "message": "尺寸",
+    "description": "Table header size"
+  },
+  "options_th_unit": {
+    "message": "单位",
+    "description": "Table header unit"
+  },
+  "options_th_action": {
+    "message": "操作",
+    "description": "Table header action"
+  },
+  "options_btn_add_ext": {
+    "message": "+ 添加扩展名规则",
+    "description": "Add ext rule button"
+  },
+  "options_sec_type_title": {
+    "message": "2. MIME 类型规则（Type）",
+    "description": "Section type title"
+  },
+  "options_sec_type_hint": {
+    "message": "按响应 content-type 匹配，支持通配符 <code>*</code>（如 <code>video/*</code>、<code>audio/mpeg</code>）。<br>判定方式与扩展名规则相同；MIME 规则在扩展名规则之后生效。",
+    "description": "Section type hint"
+  },
+  "options_th_mime": {
+    "message": "MIME（支持 *）",
+    "description": "Table header mime"
+  },
+  "options_btn_add_type": {
+    "message": "+ 添加 MIME 规则",
+    "description": "Add type rule button"
+  },
+  "options_sec_regex_title": {
+    "message": "3. 自定义正则（Regex）",
+    "description": "Section regex title"
+  },
+  "options_sec_regex_hint": {
+    "message": "对完整 URL 匹配。勾选「黑标」则命中即丢弃；填写「改写为」则用捕获组重写 URL（如 <code>$$1</code>）。<br>正则非法时该条规则会被自动跳过，不会影响其他规则。",
+    "description": "Section regex hint"
+  },
+  "options_th_regex": {
+    "message": "正则表达式",
+    "description": "Table header regex"
+  },
+  "options_th_flags": {
+    "message": "标志",
+    "description": "Table header flags"
+  },
+  "options_th_black": {
+    "message": "黑标丢弃",
+    "description": "Table header blacklist"
+  },
+  "options_th_replace": {
+    "message": "改写为",
+    "description": "Table header rewrite"
+  },
+  "options_btn_add_regex": {
+    "message": "+ 添加正则规则",
+    "description": "Add regex rule button"
+  },
+  "options_input_testurl_ph": {
+    "message": "测试 URL，如 https://cdn.example.com/video.mp4?token=1",
+    "description": "Test URL placeholder"
+  },
+  "options_btn_test": {
+    "message": "测试第一条启用的正则",
+    "description": "Test regex button"
+  },
+  "options_sec_block_title": {
+    "message": "4. URL 黑白名单（blockUrl）",
+    "description": "Section block title"
+  },
+  "options_sec_block_hint": {
+    "message": "按「发起请求的页面 URL」匹配，支持通配符 <code>*</code> 与 <code>?</code>。每行一条。<br>黑名单模式：命中的网站<b>不抓取</b>；白名单模式：<b>仅</b>命中的网站抓取。",
+    "description": "Section block hint"
+  },
+  "options_block_black": {
+    "message": "黑名单（命中的网站不抓取）",
+    "description": "Blocklist radio"
+  },
+  "options_block_white": {
+    "message": "白名单（仅命中的网站抓取）",
+    "description": "Allowlist radio"
+  },
+  "options_block_hint2": {
+    "message": "提示：<b>列表为空时本条规则不生效（始终放行）</b>——切到白名单模式但还没填条目时，不会出现「什么都抓不到」的情况。",
+    "description": "Blocklist empty hint"
+  },
+  "options_input_blocklist_ph": {
+    "message": "每行一条，例如：\n*://*.example.com/*\nhttps://www.bilibili.com/*",
+    "description": "Blocklist textarea placeholder"
+  },
+  "options_sec_download_title": {
+    "message": "5. 下载设置",
+    "description": "Section download title"
+  },
+  "options_sec_download_hint": {
+    "message": "控制下载行为（保存在本地存储，不随账号同步）。",
+    "description": "Section download hint"
+  },
+  "options_download_saveas_label": {
+    "message": "下载时弹出「另存为」对话框<br><span class=\"hint\">默认<b>关闭</b>：直接保存到浏览器默认下载目录（批量下载更顺畅）。开启后每次下载都会询问保存位置。</span>",
+    "description": "Save-as checkbox label"
+  },
+  "options_label_filename_template": {
+    "message": "下载文件名模板（留空 = 保持原文件名）",
+    "description": "Filename template label"
+  },
+  "options_input_template_ph": {
+    "message": "例：$${title}/$${fileName}.$${ext}",
+    "description": "Filename template placeholder"
+  },
+  "options_template_hint": {
+    "message": "可用变量：<code>$${title}</code> 页面标题 · <code>$${ext}</code> 扩展名 · <code>$${date}</code> 日期 · <code>$${time}</code> 时间 · <code>$${fileName}</code> 原文件名 · <code>$${host}</code> 域名 · <code>$${type}</code> 类型<br>支持子目录（如 <code>$${title}/$${fileName}.$${ext}</code>，会自动建文件夹）。",
+    "description": "Filename template hint"
+  },
+  "options_label_aria2": {
+    "message": "aria2 RPC 地址（留空 = 不启用「发送到 aria2」按钮）",
+    "description": "aria2 label"
+  },
+  "options_input_aria2_ph": {
+    "message": "http://127.0.0.1:6800/jsonrpc",
+    "description": "aria2 placeholder"
+  },
+  "options_aria2_hint": {
+    "message": "若 aria2 配了密钥（<code>--rpc-secret</code>），写成 <code>http://127.0.0.1:6800/jsonrpc?token=你的密钥</code>。发送时会自动透传 Referer 与已捕获的鉴权头。",
+    "description": "aria2 hint"
+  },
+  "options_btn_save": {
+    "message": "保存设置",
+    "description": "Save button"
+  },
+  "options_btn_reset": {
+    "message": "清空全部规则（恢复默认）",
+    "description": "Reset button"
+  },
+  "options_empty_ext": {
+    "message": "暂无规则。留空表示沿用默认逻辑（扩展名白名单 + 内置尺寸阈值）。",
+    "description": "Empty ext row"
+  },
+  "options_empty_type": {
+    "message": "暂无规则。留空表示沿用默认逻辑（content-type 校验 + 内置尺寸阈值）。",
+    "description": "Empty type row"
+  },
+  "options_empty_regex": {
+    "message": "暂无规则。留空表示不启用任何自定义正则（不影响原有过滤逻辑）。",
+    "description": "Empty regex row"
+  },
+  "options_btn_del_row": {
+    "message": "删除",
+    "description": "Delete row button"
+  },
+  "options_ph_size": {
+    "message": "500 或 500-1000",
+    "description": "Size cell placeholder"
+  },
+  "options_test_no_url": {
+    "message": "请输入测试 URL",
+    "description": "Test: no URL"
+  },
+  "options_test_no_rule": {
+    "message": "没有启用且已填写正则的规则",
+    "description": "Test: no rule"
+  },
+  "options_test_no_match": {
+    "message": "未命中（第一条启用规则）",
+    "description": "Test: no match"
+  },
+  "options_test_hit": {
+    "message": "命中：$1",
+    "description": "Test: hit"
+  },
+  "options_test_discarded": {
+    "message": " → 该资源会被丢弃",
+    "description": "Test: discarded"
+  },
+  "options_test_rewrite": {
+    "message": " → 改写为：$1",
+    "description": "Test: rewrite"
+  },
+  "options_test_invalid": {
+    "message": "正则非法：$1",
+    "description": "Test: invalid regex"
+  },
+  "options_save_failed": {
+    "message": "保存失败：$1",
+    "description": "Save failed"
+  },
+  "options_save_ok": {
+    "message": "已保存，规则已立即生效",
+    "description": "Save ok"
+  },
+  "options_reset_failed": {
+    "message": "清空失败：$1",
+    "description": "Reset failed"
+  },
+  "options_reset_ok": {
+    "message": "已清空全部规则，恢复默认行为",
+    "description": "Reset ok"
+  },
+  "options_saveas_ok": {
+    "message": "已保存下载设置",
+    "description": "Save-as saved"
+  },
+  "options_tpl_saved": {
+    "message": "已保存文件名模板",
+    "description": "Template saved"
+  },
+  "options_aria2_saved": {
+    "message": "已保存 aria2 配置",
+    "description": "aria2 saved"
+  }
+}

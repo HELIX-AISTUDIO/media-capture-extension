@@ -1,0 +1,774 @@
+{
+  "ext_name": {
+    "message": "Media Catch",
+    "description": "Extension name"
+  },
+  "ext_desc": {
+    "message": "Capture video/image/audio resources (m3u8/mp4/webm/mpd/jpg/png/gif, etc.) on the current page, with m3u8/DASH parsing, preview, filtering, batch copy and download. Re-engineered after the cat-catch architecture.",
+    "description": "Extension description"
+  },
+  "common_copied": {
+    "message": "Copied",
+    "description": "Copied state"
+  },
+  "common_copy": {
+    "message": "Copy",
+    "description": "Copy button"
+  },
+  "common_download": {
+    "message": "Download",
+    "description": "Download button"
+  },
+  "common_open": {
+    "message": "Open",
+    "description": "Open button"
+  },
+  "popup_title": {
+    "message": "Media Catch",
+    "description": "Popup title"
+  },
+  "popup_filter_video": {
+    "message": "Video",
+    "description": "Filter: video"
+  },
+  "popup_filter_image": {
+    "message": "Images",
+    "description": "Filter: image"
+  },
+  "popup_filter_audio": {
+    "message": "Audio",
+    "description": "Filter: audio"
+  },
+  "popup_btn_refresh": {
+    "message": "Refresh",
+    "description": "Refresh button"
+  },
+  "popup_btn_refresh_title": {
+    "message": "Reload",
+    "description": "Refresh button tooltip"
+  },
+  "popup_btn_clear": {
+    "message": "Clear",
+    "description": "Clear button"
+  },
+  "popup_btn_clear_title": {
+    "message": "Clear list",
+    "description": "Clear button tooltip"
+  },
+  "popup_btn_settings": {
+    "message": "Settings",
+    "description": "Settings button"
+  },
+  "popup_btn_settings_title": {
+    "message": "Rule settings (ext / MIME / regex / allow-block list)",
+    "description": "Settings button tooltip"
+  },
+  "popup_btn_autodown": {
+    "message": "Auto download",
+    "description": "Auto download button"
+  },
+  "popup_btn_autodown_title": {
+    "message": "When on, newly captured resources on this page are downloaded automatically (serial, max 50 per tab)",
+    "description": "Auto download tooltip"
+  },
+  "popup_btn_autodown_on": {
+    "message": "Auto download · ON",
+    "description": "Auto download button when on"
+  },
+  "popup_autodown_on_title": {
+    "message": "Auto download is on: newly captured resources are downloaded automatically (click to turn off)",
+    "description": "Auto download tooltip when on"
+  },
+  "popup_autodown_off_title": {
+    "message": "When on, newly captured resources on this page are downloaded automatically (serial, max 50 per tab)",
+    "description": "Auto download tooltip when off"
+  },
+  "popup_btn_export": {
+    "message": "Export",
+    "description": "Export button"
+  },
+  "popup_btn_export_title": {
+    "message": "Export the current filtered result as a URL list (.txt, one per line)",
+    "description": "Export button tooltip"
+  },
+  "popup_input_keyword_ph": {
+    "message": "Filter by keyword (filename / URL / domain)",
+    "description": "Keyword input placeholder"
+  },
+  "popup_input_size_ph": {
+    "message": "Filter by size, e.g. >100KB or 500-1000MB",
+    "description": "Size input placeholder"
+  },
+  "popup_select_sort_title": {
+    "message": "Sort by",
+    "description": "Sort select tooltip"
+  },
+  "popup_sort_desc": {
+    "message": "Newest first",
+    "description": "Sort option desc"
+  },
+  "popup_sort_asc": {
+    "message": "Oldest first",
+    "description": "Sort option asc"
+  },
+  "popup_sort_size": {
+    "message": "By size",
+    "description": "Sort option size"
+  },
+  "popup_mode_label": {
+    "message": "Capture mode:",
+    "description": "Capture mode label"
+  },
+  "popup_mode_default": {
+    "message": "Default mode (keep video/audio/image/stream only)",
+    "description": "Default capture mode"
+  },
+  "popup_mode_deep": {
+    "message": "Deep search mode (capture everything)",
+    "description": "Deep capture mode"
+  },
+  "popup_empty_loading": {
+    "message": "Loading resources…",
+    "description": "Loading placeholder"
+  },
+  "popup_empty_title": {
+    "message": "No matching resources.",
+    "description": "Empty list title"
+  },
+  "popup_empty_hint": {
+    "message": "Please refresh the page, play the video, or scroll to load images, then try again.",
+    "description": "Empty list hint"
+  },
+  "popup_empty_drm": {
+    "message": "DRM-protected videos / live streams / platform-restricted (signed) videos cannot be captured",
+    "description": "Empty list DRM hint"
+  },
+  "popup_footer_hint": {
+    "message": "Tip: DRM-protected videos cannot be captured; DASH video and audio tracks are separate and must be merged with a local ffmpeg; if a download fails, use \"Open\" and save from the new tab.",
+    "description": "Popup footer hint"
+  },
+  "popup_type_video": {
+    "message": "Video",
+    "description": "Type label video"
+  },
+  "popup_type_image": {
+    "message": "Image",
+    "description": "Type label image"
+  },
+  "popup_type_audio": {
+    "message": "Audio",
+    "description": "Type label audio"
+  },
+  "popup_type_stream": {
+    "message": "Stream",
+    "description": "Type label stream"
+  },
+  "popup_type_unknown": {
+    "message": "Unknown",
+    "description": "Type label unknown"
+  },
+  "popup_type_audio_stream": {
+    "message": "Audio stream",
+    "description": "Type label audio stream"
+  },
+  "popup_size_unknown": {
+    "message": "Unknown",
+    "description": "Unknown size"
+  },
+  "popup_pause_banner": {
+    "message": "⏸ Capture paused — use the context menu or the \"Pause / Resume capture\" shortcut to resume",
+    "description": "Capture paused banner"
+  },
+  "popup_decor_label": {
+    "message": "Decorative",
+    "description": "Decorative tag"
+  },
+  "popup_decor_title": {
+    "message": "Decorative/avatar/logo thumbnail: auto-filtered in default mode, shown only in deep search mode",
+    "description": "Decorative tag tooltip"
+  },
+  "popup_auth_label": {
+    "message": "🔒 Auth",
+    "description": "Auth tag"
+  },
+  "popup_auth_title": {
+    "message": "This resource requires auth headers (e.g. Cookie/Authorization); they are attached automatically on download/preview",
+    "description": "Auth tag tooltip"
+  },
+  "popup_source_title": {
+    "message": "Source: $1",
+    "description": "Source badge tooltip"
+  },
+  "popup_source_dom": {
+    "message": "Page element/cache",
+    "description": "Source DOM"
+  },
+  "popup_source_net": {
+    "message": "Network request",
+    "description": "Source network"
+  },
+  "popup_btn_parse": {
+    "message": "Parse",
+    "description": "Parse button"
+  },
+  "popup_btn_parse_title": {
+    "message": "Parse m3u8/mpd segments",
+    "description": "Parse button tooltip"
+  },
+  "popup_open_title_viewer": {
+    "message": "View in the media viewer",
+    "description": "Open in viewer tooltip"
+  },
+  "popup_open_title_tab": {
+    "message": "Open in a new tab",
+    "description": "Open in tab tooltip"
+  },
+  "popup_btn_downloading": {
+    "message": "Downloading…",
+    "description": "Download in progress"
+  },
+  "popup_btn_started": {
+    "message": "Started",
+    "description": "Download started"
+  },
+  "popup_btn_use_open": {
+    "message": "Use \"Open\"",
+    "description": "Download failed hint"
+  },
+  "popup_download_fallback_title": {
+    "message": "The extension cannot inject Referer; click \"Open\" and use \"Save as\" in the new tab",
+    "description": "Download fallback tooltip"
+  },
+  "popup_preview_skip": {
+    "message": "⚠ Preview skipped (the browser cannot play this format directly, e.g. m3u8/ts)",
+    "description": "Preview skipped"
+  },
+  "popup_btn_viewer_new": {
+    "message": "View in new page",
+    "description": "View in new page button"
+  },
+  "popup_preview_or_download": {
+    "message": "or click \"Download\" to save",
+    "description": "Or download hint"
+  },
+  "popup_preview_stream_desc": {
+    "message": "Streaming manifest (m3u8/mpd).<br>Click \"Parse\" to view the segment list.",
+    "description": "Stream preview description"
+  },
+  "popup_preview_unknown": {
+    "message": "This media type cannot be previewed",
+    "description": "Unknown preview"
+  },
+  "popup_preview_warn_bili": {
+    "message": "⚠ Likely a Bilibili audio stream",
+    "description": "Preview warn bilibili"
+  },
+  "popup_preview_warn_dash": {
+    "message": "⚠ DASH video has no audio track (video/audio are separated); merge them with a local ffmpeg",
+    "description": "Preview warn DASH"
+  },
+  "popup_preview_warn_stream": {
+    "message": "⚠ Stream: parse the segments then merge",
+    "description": "Preview warn stream"
+  },
+  "popup_preview_auth_headers": {
+    "message": "🔒 Auth headers: $1",
+    "description": "Preview auth headers"
+  },
+  "popup_btn_parse_segments": {
+    "message": "Parse segments",
+    "description": "Parse segments button"
+  },
+  "popup_btn_curl": {
+    "message": "Copy as curl",
+    "description": "Copy as curl button"
+  },
+  "popup_curl_title": {
+    "message": "Generate a curl command with auth headers",
+    "description": "Copy as curl tooltip"
+  },
+  "popup_btn_aria2": {
+    "message": "Send to aria2",
+    "description": "Send to aria2 button"
+  },
+  "popup_aria2_title": {
+    "message": "Send to aria2 (configure the RPC URL and optional secret in settings)",
+    "description": "Send to aria2 tooltip"
+  },
+  "popup_close_title": {
+    "message": "Close (ESC)",
+    "description": "Preview close tooltip"
+  },
+  "popup_btn_copy_link": {
+    "message": "Copy link",
+    "description": "Copy link button"
+  },
+  "popup_preview_fail": {
+    "message": "Playback failed (the CDN may validate Referer or the link has expired).",
+    "description": "Preview playback failed"
+  },
+  "popup_aria2_sent": {
+    "message": "Sent",
+    "description": "Aria2 sent"
+  },
+  "popup_aria2_no_rpc": {
+    "message": "Configure it in settings first",
+    "description": "Aria2 no rpc"
+  },
+  "popup_aria2_failed": {
+    "message": "Send failed",
+    "description": "Aria2 send failed"
+  },
+  "popup_parse_parsing": {
+    "message": "Parsing…",
+    "description": "Parsing"
+  },
+  "popup_parse_failed": {
+    "message": "Parse failed",
+    "description": "Parse failed"
+  },
+  "popup_parse_unknown_err": {
+    "message": "Unknown error",
+    "description": "Unknown error"
+  },
+  "popup_parse_failed_hint": {
+    "message": "The CDN may require Referer or block cross-origin requests.",
+    "description": "Parse failed hint"
+  },
+  "popup_parse_no_segments": {
+    "message": "No segments parsed; this may be a nested m3u8 or an encrypted stream.",
+    "description": "No segments"
+  },
+  "popup_dash_tracks": {
+    "message": "DASH tracks ($1)",
+    "description": "DASH tracks count"
+  },
+  "popup_seg_count": {
+    "message": "Segments ($1)",
+    "description": "Segment count"
+  },
+  "popup_seg_truncated": {
+    "message": "… showing only the first 50 segments ($1 total)",
+    "description": "Segments truncated"
+  },
+  "popup_nested_playlists": {
+    "message": "Nested playlists ($1, multi-bitrate)",
+    "description": "Nested playlists"
+  },
+  "popup_keys_count": {
+    "message": "Encryption keys ($1, listed only, not decrypted)",
+    "description": "Keys count"
+  },
+  "popup_btn_export_m3u8": {
+    "message": "Export as .m3u8",
+    "description": "Export m3u8 button"
+  },
+  "popup_btn_export_urls": {
+    "message": "Export URL list",
+    "description": "Export URLs button"
+  },
+  "popup_btn_download_all_segs": {
+    "message": "Download all segments ($1)",
+    "description": "Download all segments"
+  },
+  "popup_parse_hint": {
+    "message": "Segments are only downloaded/exported, never merged; use a local ffmpeg / N_m3u8DL to merge.",
+    "description": "Parse hint"
+  },
+  "popup_seg_queued": {
+    "message": "Queued $1…",
+    "description": "Segments queued"
+  },
+  "popup_btn_refreshing": {
+    "message": "Refreshing…",
+    "description": "Refreshing"
+  },
+  "popup_export_done": {
+    "message": "Exported $1",
+    "description": "Export done"
+  },
+  "popup_export_empty": {
+    "message": "List is empty",
+    "description": "Export empty"
+  },
+  "viewer_title": {
+    "message": "Media viewer",
+    "description": "Viewer title"
+  },
+  "viewer_btn_speed": {
+    "message": "Speed $1×",
+    "description": "Playback speed button"
+  },
+  "viewer_btn_speed_title": {
+    "message": "Cycle through playback speeds",
+    "description": "Speed button tooltip"
+  },
+  "viewer_btn_pip": {
+    "message": "Picture-in-picture",
+    "description": "PiP button"
+  },
+  "viewer_btn_pip_title": {
+    "message": "Picture-in-picture (floating mini window)",
+    "description": "PiP button tooltip"
+  },
+  "viewer_btn_shot": {
+    "message": "Screenshot",
+    "description": "Screenshot button"
+  },
+  "viewer_btn_shot_title": {
+    "message": "Capture the current frame (may fail for cross-origin video due to copyright protection)",
+    "description": "Screenshot button tooltip"
+  },
+  "viewer_fail_reason": {
+    "message": "Possible causes: CDN strictly validates Referer / the time-limited link signature has expired / DRM encryption",
+    "description": "Fail card reason"
+  },
+  "viewer_btn_copy": {
+    "message": "Copy link",
+    "description": "Copy link button"
+  },
+  "viewer_btn_retry_download": {
+    "message": "Retry download",
+    "description": "Retry download button"
+  },
+  "viewer_btn_raw": {
+    "message": "Open the raw URL",
+    "description": "Open raw URL button"
+  },
+  "viewer_err_invalid_url": {
+    "message": "Invalid media URL",
+    "description": "Invalid URL error"
+  },
+  "viewer_err_playback": {
+    "message": "Playback failed: this resource cannot be played directly in the browser (use the download channel below to save it)",
+    "description": "Playback error"
+  },
+  "viewer_err_image": {
+    "message": "Image failed to load",
+    "description": "Image error"
+  },
+  "viewer_err_unsupported": {
+    "message": "This type cannot be previewed inline (e.g. m3u8/ts streams or unrecognized formats)",
+    "description": "Unsupported type"
+  },
+  "viewer_err_download": {
+    "message": "Download failed: $1",
+    "description": "Download error"
+  },
+  "viewer_ref_original": {
+    "message": "original page Referer",
+    "description": "Attempt label original referer"
+  },
+  "viewer_ref_bilibili": {
+    "message": "bilibili homepage Referer",
+    "description": "Attempt label bilibili referer"
+  },
+  "viewer_ref_none": {
+    "message": "no Referer",
+    "description": "Attempt label no referer"
+  },
+  "viewer_trying": {
+    "message": "Trying $1…",
+    "description": "Trying attempt"
+  },
+  "viewer_err_http_failed": {
+    "message": "HTTP $1 ($2 was also rejected by the CDN)",
+    "description": "HTTP failure"
+  },
+  "viewer_dl_connecting": {
+    "message": "Connecting…",
+    "description": "Download connecting"
+  },
+  "viewer_dl_downloading": {
+    "message": "Downloading…",
+    "description": "Download downloading"
+  },
+  "viewer_dl_progress_pct": {
+    "message": "Downloading $1%",
+    "description": "Download progress percent"
+  },
+  "viewer_dl_progress_mb": {
+    "message": "Downloading $1MB",
+    "description": "Download progress MB"
+  },
+  "viewer_dl_preparing": {
+    "message": "Preparing to save…",
+    "description": "Preparing save"
+  },
+  "viewer_dl_started": {
+    "message": "Save started ✓",
+    "description": "Save started"
+  },
+  "viewer_dl_save_label": {
+    "message": "Download & save",
+    "description": "Download save label"
+  },
+  "viewer_dl_failed": {
+    "message": "Download failed",
+    "description": "Download failed"
+  },
+  "viewer_diag_injected": {
+    "message": "Anti-hotlink Referer injection: active",
+    "description": "Diag injected"
+  },
+  "viewer_diag_not_injected": {
+    "message": "Anti-hotlink Referer injection: inactive (the CDN may reject)",
+    "description": "Diag not injected"
+  },
+  "viewer_shot_none": {
+    "message": "No frame yet",
+    "description": "Screenshot no frame"
+  },
+  "viewer_shot_failed": {
+    "message": "Screenshot failed (cross-origin restriction)",
+    "description": "Screenshot failed"
+  },
+  "viewer_shot_saved": {
+    "message": "Saved",
+    "description": "Screenshot saved"
+  },
+  "options_title": {
+    "message": "Media Catch · Rule settings",
+    "description": "Options title"
+  },
+  "options_h1": {
+    "message": "Media Catch · Rule settings",
+    "description": "Options h1"
+  },
+  "options_header_hint": {
+    "message": "Rules are saved in the browser's <b>synced storage</b> (storage.sync) and take effect immediately after saving — no need to reload the extension.<br><span class=\"safe\">Safety promise: leaving all four tables empty = exactly the default behavior</span> — users who have not configured anything will never accidentally filter out or delete any resource.",
+    "description": "Options header hint"
+  },
+  "options_sec_ext_title": {
+    "message": "1. Extension rules (Ext)",
+    "description": "Section ext title"
+  },
+  "options_sec_ext_hint": {
+    "message": "Match exactly by resource extension. When matched, decide by \"operator + size\": keep if satisfied, drop otherwise.<br>Example: extension <code>mp4</code>, operator <code>&gt;=</code>, size <code>500</code> KB → mp4 files smaller than 500KB are never captured.",
+    "description": "Section ext hint"
+  },
+  "options_th_enable": {
+    "message": "Enabled",
+    "description": "Table header enable"
+  },
+  "options_th_ext": {
+    "message": "Extension (without dot)",
+    "description": "Table header ext"
+  },
+  "options_th_operator": {
+    "message": "Operator",
+    "description": "Table header operator"
+  },
+  "options_th_size": {
+    "message": "Size",
+    "description": "Table header size"
+  },
+  "options_th_unit": {
+    "message": "Unit",
+    "description": "Table header unit"
+  },
+  "options_th_action": {
+    "message": "Action",
+    "description": "Table header action"
+  },
+  "options_btn_add_ext": {
+    "message": "+ Add extension rule",
+    "description": "Add ext rule button"
+  },
+  "options_sec_type_title": {
+    "message": "2. MIME type rules (Type)",
+    "description": "Section type title"
+  },
+  "options_sec_type_hint": {
+    "message": "Match by response content-type; wildcards are supported (e.g. <code>video/*</code>, <code>audio/mpeg</code>).<br>The logic is the same as extension rules; MIME rules apply after extension rules.",
+    "description": "Section type hint"
+  },
+  "options_th_mime": {
+    "message": "MIME (supports *)",
+    "description": "Table header mime"
+  },
+  "options_btn_add_type": {
+    "message": "+ Add MIME rule",
+    "description": "Add type rule button"
+  },
+  "options_sec_regex_title": {
+    "message": "3. Custom regex (Regex)",
+    "description": "Section regex title"
+  },
+  "options_sec_regex_hint": {
+    "message": "Match against the full URL. If \"blacklist\" is checked, a match is dropped; if \"rewrite to\" is filled, the URL is rewritten with capture groups (e.g. <code>$$1</code>).<br>If the regex is invalid, that rule is skipped automatically without affecting other rules.",
+    "description": "Section regex hint"
+  },
+  "options_th_regex": {
+    "message": "Regular expression",
+    "description": "Table header regex"
+  },
+  "options_th_flags": {
+    "message": "Flags",
+    "description": "Table header flags"
+  },
+  "options_th_black": {
+    "message": "Blacklist (drop)",
+    "description": "Table header blacklist"
+  },
+  "options_th_replace": {
+    "message": "Rewrite to",
+    "description": "Table header rewrite"
+  },
+  "options_btn_add_regex": {
+    "message": "+ Add regex rule",
+    "description": "Add regex rule button"
+  },
+  "options_input_testurl_ph": {
+    "message": "Test URL, e.g. https://cdn.example.com/video.mp4?token=1",
+    "description": "Test URL placeholder"
+  },
+  "options_btn_test": {
+    "message": "Test the first enabled regex",
+    "description": "Test regex button"
+  },
+  "options_sec_block_title": {
+    "message": "4. URL allow/block list (blockUrl)",
+    "description": "Section block title"
+  },
+  "options_sec_block_hint": {
+    "message": "Match by \"the URL of the page that makes the request\"; wildcards <code>*</code> and <code>?</code> are supported. One per line.<br>Blocklist mode: matching sites are <b>not captured</b>; allowlist mode: <b>only</b> matching sites are captured.",
+    "description": "Section block hint"
+  },
+  "options_block_black": {
+    "message": "Blocklist (matching sites are not captured)",
+    "description": "Blocklist radio"
+  },
+  "options_block_white": {
+    "message": "Allowlist (only matching sites are captured)",
+    "description": "Allowlist radio"
+  },
+  "options_block_hint2": {
+    "message": "Note: <b>when the list is empty this rule does not apply (always allowed)</b> — so switching to allowlist mode before adding entries never results in \"capturing nothing\".",
+    "description": "Blocklist empty hint"
+  },
+  "options_input_blocklist_ph": {
+    "message": "One per line, e.g.:\n*://*.example.com/*\nhttps://www.bilibili.com/*",
+    "description": "Blocklist textarea placeholder"
+  },
+  "options_sec_download_title": {
+    "message": "5. Download settings",
+    "description": "Section download title"
+  },
+  "options_sec_download_hint": {
+    "message": "Control download behavior (stored locally, not synced to your account).",
+    "description": "Section download hint"
+  },
+  "options_download_saveas_label": {
+    "message": "Ask where to save on every download<br><span class=\"hint\">Default is <b>off</b>: save directly to the browser's default download folder (smoother for batch downloads). When on, you will be asked for a location on every download.</span>",
+    "description": "Save-as checkbox label"
+  },
+  "options_label_filename_template": {
+    "message": "Download filename template (empty = keep the original filename)",
+    "description": "Filename template label"
+  },
+  "options_input_template_ph": {
+    "message": "e.g. $${title}/$${fileName}.$${ext}",
+    "description": "Filename template placeholder"
+  },
+  "options_template_hint": {
+    "message": "Available variables: <code>$${title}</code> page title · <code>$${ext}</code> extension · <code>$${date}</code> date · <code>$${time}</code> time · <code>$${fileName}</code> original filename · <code>$${host}</code> domain · <code>$${type}</code> type<br>Subdirectories are supported (e.g. <code>$${title}/$${fileName}.$${ext}</code>; folders are created automatically).",
+    "description": "Filename template hint"
+  },
+  "options_label_aria2": {
+    "message": "aria2 RPC URL (empty = disable the \"Send to aria2\" button)",
+    "description": "aria2 label"
+  },
+  "options_input_aria2_ph": {
+    "message": "http://127.0.0.1:6800/jsonrpc",
+    "description": "aria2 placeholder"
+  },
+  "options_aria2_hint": {
+    "message": "If aria2 has a secret configured (<code>--rpc-secret</code>), use <code>http://127.0.0.1:6800/jsonrpc?token=your-secret</code>. The Referer and captured auth headers are passed through automatically when sending.",
+    "description": "aria2 hint"
+  },
+  "options_btn_save": {
+    "message": "Save settings",
+    "description": "Save button"
+  },
+  "options_btn_reset": {
+    "message": "Clear all rules (restore defaults)",
+    "description": "Reset button"
+  },
+  "options_empty_ext": {
+    "message": "No rules. Empty means the default logic is used (extension whitelist + built-in size threshold).",
+    "description": "Empty ext row"
+  },
+  "options_empty_type": {
+    "message": "No rules. Empty means the default logic is used (content-type check + built-in size threshold).",
+    "description": "Empty type row"
+  },
+  "options_empty_regex": {
+    "message": "No rules. Empty means no custom regex is enabled (existing filtering logic is unaffected).",
+    "description": "Empty regex row"
+  },
+  "options_btn_del_row": {
+    "message": "Delete",
+    "description": "Delete row button"
+  },
+  "options_ph_size": {
+    "message": "500 or 500-1000",
+    "description": "Size cell placeholder"
+  },
+  "options_test_no_url": {
+    "message": "Please enter a test URL",
+    "description": "Test: no URL"
+  },
+  "options_test_no_rule": {
+    "message": "No enabled rule with a regex",
+    "description": "Test: no rule"
+  },
+  "options_test_no_match": {
+    "message": "No match (first enabled rule)",
+    "description": "Test: no match"
+  },
+  "options_test_hit": {
+    "message": "Match: $1",
+    "description": "Test: hit"
+  },
+  "options_test_discarded": {
+    "message": " → this resource will be dropped",
+    "description": "Test: discarded"
+  },
+  "options_test_rewrite": {
+    "message": " → rewritten to: $1",
+    "description": "Test: rewrite"
+  },
+  "options_test_invalid": {
+    "message": "Invalid regex: $1",
+    "description": "Test: invalid regex"
+  },
+  "options_save_failed": {
+    "message": "Save failed: $1",
+    "description": "Save failed"
+  },
+  "options_save_ok": {
+    "message": "Saved; rules took effect immediately",
+    "description": "Save ok"
+  },
+  "options_reset_failed": {
+    "message": "Clear failed: $1",
+    "description": "Reset failed"
+  },
+  "options_reset_ok": {
+    "message": "All rules cleared; default behavior restored",
+    "description": "Reset ok"
+  },
+  "options_saveas_ok": {
+    "message": "Download setting saved",
+    "description": "Save-as saved"
+  },
+  "options_tpl_saved": {
+    "message": "Filename template saved",
+    "description": "Template saved"
+  },
+  "options_aria2_saved": {
+    "message": "aria2 configuration saved",
+    "description": "aria2 saved"
+  }
+}

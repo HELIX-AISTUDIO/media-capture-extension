@@ -2,56 +2,57 @@
 <html lang="zh-CN" data-page-node-id="ChY0sEaaHr13kTELpto4b0">
 <head data-page-node-id="4pOi8NSIC2t5Ipp7DKY9rk">
   <meta charset="UTF-8" data-page-node-id="Y8gjlStutqcXZm7y32X1xX">
-  <title>网页媒体抓取器</title>
+  <title data-i18n="popup_title">网页媒体抓取器</title>
   <link rel="stylesheet" href="css/popup.css" data-page-node-id="xKBly1w0faAmm5t6yo9C5m">
 </head>
 <body data-page-node-id="pboiH8Q0BQeqmFIGXvhrEr">
   <header data-page-node-id="GYvRzPNifByvLkOYLis1Rp">
-    <h1 data-page-node-id="JxQXC5LtaOC70TGBWujGid">网页媒体抓取器 <span id="count" class="count" data-page-node-id="1GYFjhiGPaEdMIro6Ck9S3"></span></h1>
+    <h1 data-i18n="popup_title" data-page-node-id="JxQXC5LtaOC70TGBWujGid">网页媒体抓取器 <span id="count" class="count" data-page-node-id="1GYFjhiGPaEdMIro6Ck9S3"></span></h1>
     <div class="toolbar" data-page-node-id="WrA9nZpHUHoDFvsy2ek3Z2">
       <div class="filters" data-page-node-id="cNoVAx6TEnh3WP4RqKqtp0">
-        <button class="filter active" data-filter="video" data-page-node-id="lqiYTeBRgZDc0zUWOqxhhW">视频</button>
-        <button class="filter" data-filter="image" data-page-node-id="bPpnekLTZ9ntWBGs5ArPyc">图片</button>
-        <button class="filter" data-filter="audio" data-page-node-id="6iiAW0Sgzsu1jyqUhZrCfD">音频</button>
+        <button class="filter active" data-filter="video" data-i18n="popup_filter_video" data-page-node-id="lqiYTeBRgZDc0zUWOqxhhW">视频</button>
+        <button class="filter" data-filter="image" data-i18n="popup_filter_image" data-page-node-id="bPpnekLTZ9ntWBGs5ArPyc">图片</button>
+        <button class="filter" data-filter="audio" data-i18n="popup_filter_audio" data-page-node-id="6iiAW0Sgzsu1jyqUhZrCfD">音频</button>
       </div>
       <div class="actions" data-page-node-id="2EdcGiV2fmAHeNfHRzuOov">
-        <button id="refresh" title="重新读取" data-page-node-id="9mFe0DeCgzuOlnZUBLmcFE">刷新</button>
-        <button id="clear" title="清空列表" data-page-node-id="3ZSZFDXRzCdWbHYWMFMYM7">清空</button>
-        <button id="settings" title="规则设置（扩展名/MIME/正则/黑白名单）" data-page-node-id="setBtn01x">设置</button>
-        <button id="autoDown" title="开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）" data-page-node-id="autoBtn01x">自动下载</button>
-        <button id="export" title="导出当前筛选结果为 URL 列表（.txt，每行一条）" data-page-node-id="expBtn01x">导出</button>
+        <button id="refresh" title="重新读取" data-i18n="popup_btn_refresh" data-i18n-title="popup_btn_refresh_title" data-page-node-id="9mFe0DeCgzuOlnZUBLmcFE">刷新</button>
+        <button id="clear" title="清空列表" data-i18n="popup_btn_clear" data-i18n-title="popup_btn_clear_title" data-page-node-id="3ZSZFDXRzCdWbHYWMFMYM7">清空</button>
+        <button id="settings" title="规则设置（扩展名/MIME/正则/黑白名单）" data-i18n="popup_btn_settings" data-i18n-title="popup_btn_settings_title" data-page-node-id="setBtn01x">设置</button>
+        <button id="autoDown" title="开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）" data-i18n="popup_btn_autodown" data-i18n-title="popup_btn_autodown_title" data-page-node-id="autoBtn01x">自动下载</button>
+        <button id="export" title="导出当前筛选结果为 URL 列表（.txt，每行一条）" data-i18n="popup_btn_export" data-i18n-title="popup_btn_export_title" data-page-node-id="expBtn01x">导出</button>
       </div>
     </div>
     <div class="searchbar" data-page-node-id="DHmMxnSeu7VNpx4ynPDxbg">
-      <input id="keyword" type="text" placeholder="关键词筛选（文件名/URL/域名）" data-page-node-id="g1FV23UrKXjEgDVCcHPEEC">
-      <input id="sizeFilter" type="text" placeholder="大小筛选，如 &gt;100KB 或 500-1000MB" data-page-node-id="X2pJIFqDRhlfKzTAMDxlV8">
-      <select id="sortOrder" title="排序方式" data-page-node-id="a7zxy0s8i1zAA4QFHHcNBI">
-        <option value="desc" data-page-node-id="3qH2lJJzIRtZd59SnD8azA">最新置顶</option>
-        <option value="asc" data-page-node-id="TBaeh2qn4W3I7kabmsUrti">最旧置顶</option>
-        <option value="size" data-page-node-id="kYesHEa1HanMwEUJYRgyzr">按大小</option>
+      <input id="keyword" type="text" placeholder="关键词筛选（文件名/URL/域名）" data-i18n-placeholder="popup_input_keyword_ph" data-page-node-id="g1FV23UrKXjEgDVCcHPEEC">
+      <input id="sizeFilter" type="text" placeholder="大小筛选，如 &gt;100KB 或 500-1000MB" data-i18n-placeholder="popup_input_size_ph" data-page-node-id="X2pJIFqDRhlfKzTAMDxlV8">
+      <select id="sortOrder" title="排序方式" data-i18n-title="popup_select_sort_title" data-page-node-id="a7zxy0s8i1zAA4QFHHcNBI">
+        <option value="desc" data-i18n="popup_sort_desc" data-page-node-id="3qH2lJJzIRtZd59SnD8azA">最新置顶</option>
+        <option value="asc" data-i18n="popup_sort_asc" data-page-node-id="TBaeh2qn4W3I7kabmsUrti">最旧置顶</option>
+        <option value="size" data-i18n="popup_sort_size" data-page-node-id="kYesHEa1HanMwEUJYRgyzr">按大小</option>
       </select>
     </div>
     <div class="mode-switch" data-page-node-id="pLknxfnBOgJ3ypv3SSPFDo">
-      <span class="mode-label" data-page-node-id="8R6y133E21l9mtFM16Gf8f">抓取模式：</span>
+      <span class="mode-label" data-i18n="popup_mode_label" data-page-node-id="8R6y133E21l9mtFM16Gf8f">抓取模式：</span>
       <label class="mode-option" data-page-node-id="EO6rG4MH83tBMUFOSowzCV">
         <input type="radio" name="captureMode" value="default" checked data-page-node-id="JA1D9thCnd9AhPdzEapGGc">
-        <span data-page-node-id="FsxtO4I2dYU66gWppMnOtm">默认模式（仅保留视频/音频/图片/流媒体）</span>
+        <span data-i18n="popup_mode_default" data-page-node-id="FsxtO4I2dYU66gWppMnOtm">默认模式（仅保留视频/音频/图片/流媒体）</span>
       </label>
       <label class="mode-option" data-page-node-id="D8UGFYqsWgEM99zwMjAJWF">
         <input type="radio" name="captureMode" value="deep" data-page-node-id="hSvAPvxUM9vAges6k6sJBe">
-        <span data-page-node-id="lYvqRHMtrjPwhvWnGbb3Ap">深度搜索模式（全部抓取）</span>
+        <span data-i18n="popup_mode_deep" data-page-node-id="lYvqRHMtrjPwhvWnGbb3Ap">深度搜索模式（全部抓取）</span>
       </label>
     </div>
   </header>
 
   <main id="list" data-page-node-id="o7a5A3os83KdaznxFYpcHl">
-    <div class="empty" data-page-node-id="DffLDcEEWyoEzJXygdV45G">正在读取资源…</div>
+    <div class="empty" data-i18n="popup_empty_loading" data-page-node-id="DffLDcEEWyoEzJXygdV45G">正在读取资源…</div>
   </main>
 
-    <footer data-page-node-id="0Ed44HUTS8OBzko0XHN1aZ">
+    <footer data-i18n="popup_footer_hint" data-page-node-id="0Ed44HUTS8OBzko0XHN1aZ">
       提示：DRM 加密视频无法抓取；DASH 视频流与音轨分离，需用本地 ffmpeg 合并音视频；下载失败请用「打开」在新标签页另存。
     </footer>
 
+  <script src="js/i18n.js"></script>
   <script src="js/popup.js"></script>
 </body>
 </html>

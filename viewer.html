@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>媒体查看器</title>
+  <title data-i18n="viewer_title">媒体查看器</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
@@ -41,11 +41,12 @@
   <h1 id="title"></h1>
   <div class="stage" id="stage"></div>
   <div class="actions" id="ctrlBar" style="display:none;">
-    <button class="ghost" id="speedBtn" title="循环切换播放倍速">倍速 1×</button>
-    <button class="ghost" id="pipBtn" title="画中画（小窗悬浮播放）">画中画</button>
-    <button class="ghost" id="shotBtn" title="截取当前画面（跨域视频可能因版权保护而失败）">截图</button>
+    <button class="ghost" id="speedBtn" title="循环切换播放倍速" data-i18n-title="viewer_btn_speed_title">倍速 1×</button>
+    <button class="ghost" id="pipBtn" title="画中画（小窗悬浮播放）" data-i18n="viewer_btn_pip" data-i18n-title="viewer_btn_pip_title">画中画</button>
+    <button class="ghost" id="shotBtn" title="截取当前画面（跨域视频可能因版权保护而失败）" data-i18n="viewer_btn_shot" data-i18n-title="viewer_btn_shot_title">截图</button>
   </div>
   <div class="url" id="url"></div>
+  <script src="js/i18n.js"></script>
   <script src="js/viewer.js"></script>
 </body>
 </html>
