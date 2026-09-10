@@ -295,9 +295,45 @@ if (saveAsEl) {
   });
 }
 
+// 文件名模板 + aria2 RPC（P2-1 / P2-7）
+function loadExtraPrefs() {
+  try {
+    chrome.storage.local.get(['fileNameTemplate', 'aria2Rpc'], (r) => {
+      if (chrome.runtime.lastError || !r) return;
+      const t = $('fileNameTemplate');
+      const a = $('aria2Rpc');
+      if (t) t.value = typeof r.fileNameTemplate === 'string' ? r.fileNameTemplate : '';
+      if (a) a.value = typeof r.aria2Rpc === 'string' ? r.aria2Rpc : '';
+    });
+  } catch (e) { /* ignore */ }
+}
+const tplEl = $('fileNameTemplate');
+if (tplEl) {
+  tplEl.addEventListener('change', () => {
+    try {
+      chrome.storage.local.set({ fileNameTemplate: tplEl.value.trim() }, () => {
+        if (chrome.runtime.lastError) { status('保存失败：' + chrome.runtime.lastError.message, true); return; }
+        status('已保存文件名模板', false);
+      });
+    } catch (e) { /* ignore */ }
+  });
+}
+const rpcEl = $('aria2Rpc');
+if (rpcEl) {
+  rpcEl.addEventListener('change', () => {
+    try {
+      chrome.storage.local.set({ aria2Rpc: rpcEl.value.trim() }, () => {
+        if (chrome.runtime.lastError) { status('保存失败：' + chrome.runtime.lastError.message, true); return; }
+        status('已保存 aria2 配置', false);
+      });
+    } catch (e) { /* ignore */ }
+  });
+}
+
 // ---------- 初始加载 ----------
 function load() {
   loadDownloadPref();
+  loadExtraPrefs();
   try {
     chrome.storage.sync.get('userRules', (result) => {
       if (!chrome.runtime.lastError && result && result.userRules) {

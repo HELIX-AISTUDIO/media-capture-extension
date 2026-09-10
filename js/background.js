@@ -251,6 +251,14 @@ try {
   });
 } catch (e) { /* ignore */ }
 
+// ---------- 下载文件名模板（P2-1）与 aria2 RPC 配置（P2-7） ----------
+// 模板支持变量：${title} 页面标题 / ${ext} 扩展名 / ${date} 日期 / ${time} 时间
+//               ${fileName} 原文件名（无扩展名）/ ${host} 域名 / ${type} 资源类型
+// 模板里可写子目录（如 ${title}/${fileName}），逐段清洗后保留目录结构。
+// 未配置模板 = 保持原文件名（与历史行为完全一致，升级零影响）。
+let fileNameTemplate = '';
+let aria2Rpc = '';
+
 // 规则/偏好热更新：options 页保存后立即生效，无需重载扩展
 safeOn(chrome.storage, 'onChanged', (changes, area) => {
   if (area === 'sync' && changes.userRules) {
@@ -258,10 +266,62 @@ safeOn(chrome.storage, 'onChanged', (changes, area) => {
     console.log('[SW] 用户规则已热更新');
     return;
   }
-  if (area === 'local' && changes.downloadSaveAs) {
-    downloadSaveAs = changes.downloadSaveAs.newValue === true;
+  if (area === 'local') {
+    if (changes.downloadSaveAs) downloadSaveAs = changes.downloadSaveAs.newValue === true;
+    if (changes.fileNameTemplate && typeof changes.fileNameTemplate.newValue === 'string') {
+      fileNameTemplate = changes.fileNameTemplate.newValue;
+    }
+    if (changes.aria2Rpc) {
+      aria2Rpc = String(changes.aria2Rpc.newValue || '');
+    }
   }
 });
+
+try {
+  chrome.storage.local.get(['fileNameTemplate', 'aria2Rpc'], (r) => {
+    if (chrome.runtime.lastError || !r) return;
+    if (typeof r.fileNameTemplate === 'string') fileNameTemplate = r.fileNameTemplate;
+    if (typeof r.aria2Rpc === 'string') aria2Rpc = r.aria2Rpc;
+  });
+} catch (e) { /* ignore */ }
+
+function applyFileNameTemplate(tpl, info) {
+  if (!tpl) return null;
+  const fileName = String((info && info.filename) || '');
+  const dot = fileName.lastIndexOf('.');
+  const base = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const ext = (() => {
+    if (dot > 0 && fileName.length - dot <= 16) return fileName.slice(dot + 1);
+    try {
+      const m = /\.([a-z0-9]{2,5})(\?|#|$)/i.exec(new URL(String((info && info.url) || '')).pathname);
+      return m ? m[1].toLowerCase() : '';
+    } catch (e) { return ''; }
+  })();
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  let host = '';
+  try { host = new URL(String((info && info.url) || '')).hostname; } catch (e) { /* ignore */ }
+  const vars = {
+    title: String((info && info.title) || ''),
+    ext: ext,
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`,
+    fileName: base,
+    host: host,
+    type: String((info && info.type) || '')
+  };
+  const raw = String(tpl).replace(/\$\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
+  // 逐段清洗但保留 / 目录分隔符（safeFilename 会干掉 /，所以必须分段处理）
+  const parts = raw.split('/').map((s) => s.trim()).filter(Boolean).map((s) => safeFilename(s));
+  if (parts.length === 0) return null;
+  // 安全网：模板结果最后一段若没有扩展名，自动补上原扩展名。
+  // 避免用户只写 ${fileName}（该变量按设计不含扩展名）时下载出「无扩展名」的废文件。
+  const last = parts[parts.length - 1];
+  if (ext && last.lastIndexOf('.') <= 0) {
+    parts[parts.length - 1] = last + '.' + ext;
+  }
+  return parts.join('/');
+}
 
 // ---------- 抓取开关（暂停/恢复） ----------
 // 供快捷键 / 右键菜单控制：暂停时不再往列表里写入新资源（已有列表保留）。
@@ -693,6 +753,53 @@ function segmentExtOf(url) {
   return '.bin';
 }
 
+// ---------- 按需补全缺失大小（P2-8） ----------
+// 仅在用户主动打开预览时由 popup 触发**一次** HEAD，读取 content-length /
+// content-range 得到真实大小；结果做 LRU 缓存防重复请求。
+// 🔴 红线：只在 SW 侧按需探测一次——绝不在 content script 内探测，也绝不批量/自动探测。
+const sizeProbeCache = new Map();   // url -> size | null
+const SIZE_PROBE_CACHE_MAX = 200;
+const SIZE_PROBE_TIMEOUT_MS = 3000;
+
+function probeSize(url) {
+  return new Promise((resolve) => {
+    if (!url) { resolve(null); return; }
+    if (sizeProbeCache.has(url)) { resolve(sizeProbeCache.get(url)); return; }
+    let done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      try {
+        sizeProbeCache.set(url, v);
+        if (sizeProbeCache.size > SIZE_PROBE_CACHE_MAX) {
+          const oldest = sizeProbeCache.keys().next().value;
+          sizeProbeCache.delete(oldest);
+        }
+      } catch (e) { /* ignore */ }
+      resolve(v);
+    };
+    // 超时兜底：3 秒未返回按 null 处理，绝不阻塞 UI
+    setTimeout(() => finish(null), SIZE_PROBE_TIMEOUT_MS);
+    try {
+      fetch(url, { method: 'HEAD', credentials: 'include' })
+        .then((resp) => {
+          let n = null;
+          try {
+            const cr = resp.headers.get('content-range');   // 优先（分片场景才是真实总大小）
+            const cl = resp.headers.get('content-length');
+            if (cr) {
+              const m = /bytes\s+\d+-\d+\/(\d+)/i.exec(cr);
+              if (m) n = parseInt(m[1], 10);
+            }
+            if (n == null && cl) n = parseInt(cl, 10);
+          } catch (e) { /* ignore */ }
+          finish((n != null && !isNaN(n) && n > 0) ? n : null);
+        })
+        .catch(() => finish(null));
+    } catch (e) { finish(null); }
+  });
+}
+
 // ---------- 按 tab 自动下载（P1-4） ----------
 // 开关与 tab 绑定，状态存 storage.session（跨 SW 休眠存活）。
 // 🔴 三道防失控护栏（分片流场景最容易出事）：
@@ -1041,6 +1148,44 @@ safeOn(chrome.contextMenus, 'onClicked', (info, tab) => {
   } catch (e) { console.warn('[SW] contextMenus onClicked failed:', String(e && e.message || e)); }
 });
 
+// ---------- 对外接口（P2-7）：供其他扩展 / 脚本读取抓取结果 ----------
+// 只暴露「只读」的资源列表（url/type/size/filename/referer 等展示字段），
+// 🔴 刻意不返回 requestHeaders / cookie 等敏感凭据；也不接受任何写操作。
+// 参考猫抓的 onMessageExternal(getData / getCurrentTabData)，独立实现。
+safeOn(chrome.runtime, 'onMessageExternal', (msg, sender, sendResponse) => {
+  try {
+    if (!msg || msg.action !== 'getData') {
+      sendResponse({ ok: false, error: 'unsupported_action' });
+      return;
+    }
+    let tabId = msg.tabId;
+    if (tabId == null && sender && sender.tab && sender.tab.id != null) tabId = sender.tab.id;
+    if (tabId == null || tabId < 0) {
+      sendResponse({ ok: false, error: 'no_tab' });
+      return;
+    }
+    const list = Array.from(store.get(tabId)?.values() || []);
+    sendResponse({
+      ok: true,
+      count: list.length,
+      resources: list.map((r) => ({
+        url: r.url,
+        type: r.type,
+        mime: r.mime || null,
+        size: r.size || null,
+        filename: r.filename || null,
+        referer: r.referer || null,
+        width: r.width || null,
+        height: r.height || null,
+        source: r.source || null,
+        ts: r.ts || null
+      }))
+    });
+  } catch (e) {
+    sendResponse({ ok: false, error: String(e && e.message || e) });
+  }
+});
+
 // ---------- 消息路由 ----------
 safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
   if (!msg || !msg.action) return;
@@ -1190,6 +1335,67 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
       break;
     }
 
+    // 按需补全缺失大小（P2-8）：用户主动打开预览时探测一次 HEAD
+    case 'probeSize': {
+      probeSize(msg.url).then((size) => {
+        // 回写 store：让列表与后续读取也能拿到大小
+        if (size != null && msg.tabId != null) {
+          try {
+            const map = store.get(msg.tabId);
+            if (map) {
+              const r = map.get(normalizeUrl(msg.url));
+              if (r && (r.size == null || r.size === 0)) {
+                r.size = size;
+                schedulePersist(msg.tabId);
+              }
+            }
+          } catch (e) { /* ignore */ }
+        }
+        sendResponse({ ok: true, size });
+      });
+      return true; // 异步
+    }
+
+    // 发送到 aria2（P2-7）：JSON-RPC aria2.addUri，透传 referer / 鉴权头 / 文件名模板
+    case 'sendToAria2': {
+      const item = msg.item || {};
+      const rpc = aria2Rpc;
+      if (!rpc) { sendResponse({ ok: false, error: 'no_rpc' }); break; }
+      if (!item.url) { sendResponse({ ok: false, error: 'no_url' }); break; }
+      // 解析 endpoint 与 token（支持把 token 写成 query：.../jsonrpc?token=xxx）
+      let endpoint = rpc;
+      let token = '';
+      try {
+        const u = new URL(rpc);
+        if (u.searchParams.has('token')) {
+          token = u.searchParams.get('token') || '';
+          u.searchParams.delete('token');
+          endpoint = u.toString();
+        }
+      } catch (e) { /* 非法 URL 交给 fetch 报错 */ }
+      const options = {};
+      if (item.referer) options.referer = item.referer;
+      const tplName = applyFileNameTemplate(fileNameTemplate, item);
+      if (tplName) options.out = tplName;
+      if (item.requestHeaders && typeof item.requestHeaders === 'object') {
+        const hs = [];
+        for (const k of Object.keys(item.requestHeaders)) hs.push(k + ': ' + item.requestHeaders[k]);
+        if (hs.length > 0) options.header = hs;
+      }
+      const params = token ? [token, [item.url], options] : [[item.url], options];
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now().toString(), method: 'aria2.addUri', params })
+      }).then((resp) => resp.json())
+        .then((data) => {
+          if (data && data.error) sendResponse({ ok: false, error: 'rpc_error', message: data.error.message });
+          else sendResponse({ ok: true, gid: data && data.result });
+        })
+        .catch((e) => sendResponse({ ok: false, error: 'network', message: String(e && e.message || e) }));
+      return true; // 异步
+    }
+
     case 'download': {
       // MV3 安全约束：扩展不能通过 chrome.downloads.download({headers:[...]})
       // 注入 Referer 等 unsafe 头（会抛 "Unsafe request header name"）。
@@ -1197,9 +1403,13 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
       // 因此下载期间用 DNR 会话规则注入 Referer，下载结束自动移除。
       // 文件名先经 safeFilename 清洗，修复超长/非法字符导致下载失败。
       if (msg.url && (msg.headers || msg.referer)) setPreviewRefererRule(msg.url, msg.headers || msg.referer);
+      // 文件名模板（P2-1）：未配置则用原文件名（行为与历史一致）
+      const tplName = applyFileNameTemplate(fileNameTemplate, {
+        title: msg.title, url: msg.url, filename: msg.filename, type: msg.type
+      });
       chrome.downloads.download({
         url: msg.url,
-        filename: safeFilename(msg.filename),
+        filename: tplName || safeFilename(msg.filename),
         // saveAs 由用户偏好决定（默认 false = 直接下载到默认目录）
         saveAs: downloadSaveAs
       }, (id) => {
@@ -1214,7 +1424,9 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
           filename: msg.filename,
           mime: msg.mime,
           referer: msg.referer,
-          requestHeaders: msg.headers
+          requestHeaders: msg.headers,
+          title: msg.title,
+          type: msg.type
         });
         sendResponse({ ok: id !== undefined, downloadId: id });
       });

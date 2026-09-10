@@ -18,6 +18,7 @@
 
 let currentTabId = null;
 let currentTabUrl = '';
+let currentTabTitle = '';
 let allResources = [];
 let currentFilter = 'video';
 let currentSort = 'desc';
@@ -87,6 +88,16 @@ function hostOf(url) {
   try { return new URL(url).hostname; } catch { return ''; }
 }
 
+// ---------- 时间分组（P2-2） ----------
+// 按时间排序时，相邻条目时间差超过阈值就插入一条时间分隔线，便于分辨「同一批抓取」
+// 的资源（参考猫抓 groupTime 的分组思路，仅做视觉分隔，不改变排序与筛选逻辑）。
+const GROUP_GAP_MS = 2 * 60 * 1000;
+function fmtGroupTime(ts) {
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 // ---------- 大小表达式解析 ----------
 // 支持：>100KB  <1GB  =500KB  <=500KB  >=500KB  500-1000MB  1MB 等
 function parseSizeExpr(expr) {
@@ -150,8 +161,25 @@ function thumbHtml(r) {
 }
 
 // ---------- 筛选/排序 ----------
+// 关键词支持 /正则/flags 语法（如 /\.mp4$/i）；非法正则自动降级为普通包含匹配。
+function parseKeywordExpr(kw) {
+  const s = String(kw || '').trim();
+  if (s.length >= 3 && s.charAt(0) === '/') {
+    const last = s.lastIndexOf('/');
+    if (last > 0) {
+      const body = s.slice(1, last);
+      const flags = s.slice(last + 1);
+      if (/^[gimsuy]*$/.test(flags)) {
+        try { return { type: 'regex', re: new RegExp(body, flags) }; } catch (e) { /* 非法则降级为文本 */ }
+      }
+    }
+  }
+  return { type: 'text', low: s.toLowerCase() };
+}
+
 function filteredAndSorted() {
-  const keyword = (document.getElementById('keyword').value || '').trim().toLowerCase();
+  const kwRaw = (document.getElementById('keyword').value || '').trim();
+  const kwExpr = kwRaw ? parseKeywordExpr(kwRaw) : null;
   const sizeExpr = parseSizeExpr(document.getElementById('sizeFilter').value);
 
   let list = allResources.filter((r) => {
@@ -164,10 +192,15 @@ function filteredAndSorted() {
         return false;
       }
     }
-    // 关键词筛选
-    if (keyword) {
-      const hay = (r.filename + ' ' + r.url + ' ' + hostOf(r.url)).toLowerCase();
-      if (!hay.includes(keyword)) return false;
+    // 关键词筛选（支持 /正则/ 语法）
+    if (kwExpr) {
+      const hay = (r.filename || '') + ' ' + (r.url || '') + ' ' + hostOf(r.url);
+      if (kwExpr.type === 'regex') {
+        kwExpr.re.lastIndex = 0;   // 带 g 标志时必须重置，否则 lastIndex 复用会漏匹配
+        if (!kwExpr.re.test(hay)) return false;
+      } else if (!hay.toLowerCase().includes(kwExpr.low)) {
+        return false;
+      }
     }
     // 大小筛选
     if (sizeExpr && !sizeMatches(r.size, sizeExpr)) return false;
@@ -250,6 +283,10 @@ function render() {
     return;
   }
 
+  // 时间分组：仅按时间排序时启用（按大小时分组无意义）
+  const useTimeGroup = (currentSort === 'desc' || currentSort === 'asc');
+  let prevGroupTs = null;
+
   listEl.innerHTML = filtered.map((r, idx) => {
     const baseMeta = r.likelyAudio ? { label: '音频流', cls: 'tag-audio' } : (TYPE_META[r.type] || TYPE_META.unknown);
     const sMeta = SOURCE_META[r.source] || SOURCE_META.network;
@@ -269,7 +306,15 @@ function render() {
     })();
     const dim = (r.width && r.height) ? `${r.width}×${r.height}` : '';
     const isStream = r.type === 'stream';
-    return `
+    // 时间分隔线（仅时间排序时；纯视觉，不影响 data-idx 与事件绑定）
+    let groupHtml = '';
+    if (useTimeGroup && r.ts) {
+      if (prevGroupTs == null || Math.abs(prevGroupTs - r.ts) > GROUP_GAP_MS) {
+        groupHtml = `<div class="time-group">${escapeHtml(fmtGroupTime(r.ts))}</div>`;
+      }
+      prevGroupTs = r.ts;
+    }
+    return groupHtml + `
       <div class="item" data-idx="${idx}">
         <div class="thumb-box">${thumbHtml(r)}</div>
         <div class="item-body">
@@ -321,7 +366,7 @@ function render() {
         openViewer(r2, true);
         return;
       }
-      downloadUrl(btn, btn.dataset.url, btn.dataset.name, (r2 && r2.referer) || currentTabUrl || '', (r2 && r2.requestHeaders) || undefined, (r2 && r2.mime) || '');
+      downloadUrl(btn, btn.dataset.url, btn.dataset.name, (r2 && r2.referer) || currentTabUrl || '', (r2 && r2.requestHeaders) || undefined, (r2 && r2.mime) || '', (r2 && r2.type) || '', currentTabTitle);
     });
   });
   // 打开按钮：视频/音频 → 媒体查看器；其它 → 新标签页原始地址
@@ -354,13 +399,26 @@ function render() {
   });
 }
 
+// ---------- 导出当前筛选结果（P2-9） ----------
+// 导出「当前筛选/排序后」的列表为 URL 文本（每行一条），便于交给
+// aria2 / IDM / 本地脚本批量处理。导出内容与界面所见完全一致。
+function exportFilteredList() {
+  const list = filteredAndSorted();
+  if (list.length === 0) return 0;
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  saveTextAsFile(list.map((r) => r.url).join('\n'), 'media-catch-' + stamp + '.txt', 'text/plain');
+  return list.length;
+}
+
 // ---------- 下载（带失败兜底） ----------
 // referer 传给后台：防盗链 CDN 的下载请求需注入 Referer，否则 403 被存成 .htm
 // headers 是资源完整鉴权头对象（可为空），供后台 DNR 一并注入 cookie/origin。
-function downloadUrl(btn, url, filename, referer, headers, mime) {
+function downloadUrl(btn, url, filename, referer, headers, mime, type, title) {
   btn.disabled = true;
   btn.textContent = '下载中…';
-  chrome.runtime.sendMessage({ action: 'download', url, filename, referer, headers, mime }, (resp) => {
+  chrome.runtime.sendMessage({ action: 'download', url, filename, referer, headers, mime, type, title }, (resp) => {
     btn.disabled = false;
     if (resp && resp.ok) {
       btn.textContent = '已发起';
@@ -445,6 +503,19 @@ function buildCurlCommand(r) {
 }
 
 async function showPreview(r, autoParse) {
+  // 缺失大小按需补全（P2-8）：仅在用户主动打开预览时探测一次（后台发一次 HEAD），
+  // 绝不在 content script 内探测、绝不批量/自动探测（项目红线）。
+  if (r.size == null && /^https?:/i.test(r.url)) {
+    try {
+      const pr = await chrome.runtime.sendMessage({ action: 'probeSize', url: r.url, tabId: currentTabId });
+      if (pr && pr.ok && pr.size != null) {
+        r.size = pr.size;
+        const same = allResources.find((x) => x.url === r.url);
+        if (same) same.size = pr.size;   // 同步列表数据，下次渲染即显示
+      }
+    } catch (e) { /* 探测失败不影响预览 */ }
+  }
+
   // 先注入 Referer 会话规则，再渲染播放器——避免 <video> 请求先于规则发出
   // 导致防盗链 CDN 首次请求就 403（注入的 Referer 用抓取时记录的原始值）
   if ((r.type === 'video' || r.type === 'audio')) {
@@ -502,6 +573,8 @@ async function showPreview(r, autoParse) {
   const curlBtn = (r.requestHeaders && Object.keys(r.requestHeaders).length > 0)
     ? `<button class="btn btn-curl" data-url="${escapeHtml(r.url)}" title="生成带鉴权头的 curl 命令">复制为curl</button>`
     : '';
+  // 「发送到 aria2」按钮（P2-7）：需先在设置页配置 RPC 地址；未配置时点击会提示
+  const aria2Btn = `<button class="btn btn-aria2" data-url="${escapeHtml(r.url)}" title="发送到 aria2（需在设置页配置 RPC 地址与可选密钥）">发送到 aria2</button>`;
 
   overlay.innerHTML = `
     <div class="preview-card">
@@ -518,6 +591,7 @@ async function showPreview(r, autoParse) {
           <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}">下载</button>
           <button class="btn btn-open" data-url="${escapeHtml(r.url)}">打开</button>
           ${curlBtn}
+          ${aria2Btn}
           ${parseBtn}
         </div>
       </div>
@@ -562,7 +636,7 @@ async function showPreview(r, autoParse) {
       closePreview();
       return;
     }
-    downloadUrl(e.target, r.url, safeFileName(filename), r.referer || currentTabUrl || '', r.requestHeaders || undefined, r.mime || '');
+    downloadUrl(e.target, r.url, safeFileName(filename), r.referer || currentTabUrl || '', r.requestHeaders || undefined, r.mime || '', r.type || '', currentTabTitle);
   });
   overlay.querySelector('.btn-open').addEventListener('click', () => {
     if (r.type === 'video' || r.type === 'audio') openViewer(r);
@@ -581,6 +655,33 @@ async function showPreview(r, autoParse) {
   const parseBtnEl = overlay.querySelector('#previewParse');
   if (parseBtnEl) {
     parseBtnEl.addEventListener('click', () => doParse(r));
+  }
+  // 「发送到 aria2」绑定（P2-7）
+  const aria2BtnEl = overlay.querySelector('.btn-aria2');
+  if (aria2BtnEl) {
+    aria2BtnEl.addEventListener('click', () => {
+      aria2BtnEl.disabled = true;
+      chrome.runtime.sendMessage({
+        action: 'sendToAria2',
+        item: {
+          url: r.url,
+          filename: filename,
+          referer: r.referer || currentTabUrl || '',
+          type: r.type,
+          title: currentTabTitle,
+          requestHeaders: r.requestHeaders || null
+        }
+      }, (resp) => {
+        aria2BtnEl.disabled = false;
+        if (resp && resp.ok) {
+          aria2BtnEl.textContent = '已发送';
+        } else {
+          const err = resp && resp.error;
+          aria2BtnEl.textContent = (err === 'no_rpc') ? '请先在设置页配置' : '发送失败';
+        }
+        setTimeout(() => { aria2BtnEl.textContent = '发送到 aria2'; }, 2000);
+      });
+    });
   }
   // 自动解析
   if (autoParse && isStream) doParse(r);
@@ -741,6 +842,7 @@ function refresh() {
       if (!tabs[0]) { resolve(); return; }
       currentTabId = tabs[0].id;
       currentTabUrl = tabs[0].url || '';
+      currentTabTitle = tabs[0].title || '';   // 供文件名模板 ${title} 使用（P2-1）
       // 读取抓取开关状态（快捷键/右键菜单可切换）
       try {
         chrome.runtime.sendMessage({ action: 'getCaptureState' }, (st) => {
@@ -877,6 +979,14 @@ document.getElementById('autoDown').addEventListener('click', () => {
     autoDownOn = !!(resp && resp.on);
     applyAutoDownUI();
   });
+});
+
+// 导出按钮：把「当前筛选结果」导出为 URL 列表（.txt）
+document.getElementById('export').addEventListener('click', () => {
+  const btn = document.getElementById('export');
+  const n = exportFilteredList();
+  btn.textContent = n > 0 ? ('已导出 ' + n) : '列表为空';
+  setTimeout(() => { btn.textContent = '导出'; }, 1600);
 });
 
 // 批量复制按钮已移除（v0.2.4 精简界面，仅保留刷新/清空）

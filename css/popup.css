@@ -191,6 +191,15 @@ main {
   line-height: 1.6;
 }
 
+/* 时间分组分隔线（P2-2，仅按时间排序时出现） */
+.time-group {
+  font-size: 11px;
+  color: #9ca3af;
+  padding: 6px 2px 4px;
+  border-bottom: 1px dashed #e5e7eb;
+  margin-bottom: 8px;
+}
+
 .item {
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -199,8 +208,7 @@ main {
   margin-bottom: 8px;
   display: flex;
   gap: 9px;
-  cursor: pointer;
-  transition: border-color 0.15s;
+  cursor: pointer;  transition: border-color 0.15s;
 }
 
 .item:hover { border-color: #93c5fd; }

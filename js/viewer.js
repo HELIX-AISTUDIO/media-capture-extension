@@ -233,6 +233,76 @@ async function downloadViaBlob() {
   }
 }
 
+// ---------- 媒体控制（P2-5） ----------
+// 仅作用于查看器内的媒体元素（自包含实现，不需要任何新权限）。
+// ⚠️ 截图对「跨域且未开 CORS」的 CDN 视频会因 canvas 被污染而失败，
+//    已做友好降级提示（这不是 bug，是浏览器的安全限制）。
+const SPEED_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+let speedIdx = 2;
+
+function setupMediaControls(mediaEl) {
+  const bar = document.getElementById('ctrlBar');
+  if (!bar || !mediaEl) return;
+  bar.style.display = 'flex';
+  const isVideo = mediaEl.tagName === 'VIDEO';
+
+  const speedBtn = document.getElementById('speedBtn');
+  if (speedBtn) {
+    speedBtn.addEventListener('click', () => {
+      speedIdx = (speedIdx + 1) % SPEED_STEPS.length;
+      const rate = SPEED_STEPS[speedIdx];
+      try { mediaEl.playbackRate = rate; } catch (e) { /* ignore */ }
+      speedBtn.textContent = '倍速 ' + rate + '×';
+    });
+  }
+
+  const pipBtn = document.getElementById('pipBtn');
+  if (pipBtn) {
+    if (!isVideo || !document.pictureInPictureEnabled) {
+      pipBtn.style.display = 'none';
+    } else {
+      pipBtn.addEventListener('click', () => {
+        try {
+          if (document.pictureInPictureElement) document.exitPictureInPicture();
+          else mediaEl.requestPictureInPicture();
+        } catch (e) { /* ignore */ }
+      });
+    }
+  }
+
+  const shotBtn = document.getElementById('shotBtn');
+  if (shotBtn) {
+    if (!isVideo) {
+      shotBtn.style.display = 'none';
+    } else {
+      shotBtn.addEventListener('click', () => {
+        const restore = () => setTimeout(() => { shotBtn.textContent = '截图'; }, 1800);
+        try {
+          const c = document.createElement('canvas');
+          c.width = mediaEl.videoWidth || 0;
+          c.height = mediaEl.videoHeight || 0;
+          if (!c.width || !c.height) { shotBtn.textContent = '暂无画面'; restore(); return; }
+          c.getContext('2d').drawImage(mediaEl, 0, 0, c.width, c.height);
+          c.toBlob((blob) => {
+            if (!blob) { shotBtn.textContent = '截图失败（跨域限制）'; restore(); return; }
+            const objUrl = URL.createObjectURL(blob);
+            const base = safeName(name).replace(/\.[^.]*$/, '') || 'shot';
+            chrome.downloads.download({ url: objUrl, filename: base + '_' + Date.now() + '.png', saveAs: false }, () => {
+              setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
+            });
+            shotBtn.textContent = '已保存';
+            restore();
+          }, 'image/png');
+        } catch (e) {
+          // 跨域视频会污染 canvas，toBlob/drawImage 抛 SecurityError —— 友好降级
+          shotBtn.textContent = '截图失败（跨域限制）';
+          restore();
+        }
+      });
+    }
+  }
+}
+
 // 页面顶部的注入状态行
 function updateDiag() {
   const el = document.getElementById('diag');
@@ -286,6 +356,7 @@ async function init() {
       failCard('播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）');
     });
     stage.appendChild(v);
+    setupMediaControls(v);   // 媒体控制条（P2-5：倍速/画中画/截图）
   } else if (isAudio) {
     const a = document.createElement('audio');
     a.controls = true;
@@ -295,6 +366,7 @@ async function init() {
       failCard('播放失败：该资源无法在浏览器直接播放（可用下方下载通道保存）');
     });
     stage.appendChild(a);
+    setupMediaControls(a);   // 媒体控制条（P2-5：倍速；视频专属项自动隐藏）
   } else if (isImage) {
     const img = document.createElement('img');
     img.referrerPolicy = 'no-referrer';

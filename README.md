@@ -15,8 +15,9 @@
 - **规则可配置（options 页）**：扩展名 / MIME / 自定义正则 / URL 黑白名单四张表，保存即生效。**全部留空 = 与默认行为完全一致**。
 - **弹窗界面**：类型 / 关键词 / 大小区间表达式筛选，排序，预览大窗口（视频直接播放）。
 - **抓取模式**：默认模式（过滤头像 / 图标 / svg / ico 等噪音）与深度搜索模式（全量抓取 + MAIN world 深搜）一键切换。
-- **下载增强**：失败自动回退 Blob 通道重试；`saveAs` 默认关闭；分片批量下载与 `.m3u8` / URL 列表导出（**不合并**）。
-- **效率工具**：快捷键与右键菜单、按标签页自动下载（串行 + 上限 50 防护）。
+- **下载增强**：失败自动回退 Blob 通道重试；`saveAs` 默认关闭；文件名模板（`${title}`/`${date}` 等，支持子目录）；分片批量下载与 `.m3u8` / URL 列表导出（**不合并**）。
+- **效率工具**：快捷键与右键菜单、按标签页自动下载（串行 + 上限 50 防护）、导出当前筛选结果、aria2 RPC 推送、对外只读接口。
+- **面板形态**：弹窗 + **侧边栏**（常驻）；媒体查看器内置倍速 / 画中画 / 截图控制。
 - **SW 生命周期健壮性**：`storage.session` 持久化 + `alarms` 定时唤醒 + `webNavigation` 导航唤醒 + `onConnect` 长连接保活，解决 Service Worker 休眠导致抓取中断。
 - **多 Tab 状态管理**：按 tab 分桶存储，导航刷新自动清理，关闭 tab 自动回收，避免数据残留错乱。
 
@@ -57,9 +58,10 @@
 | `declarativeNetRequest` | 会话规则注入 Referer / Cookie 等请求头（预览与下载防盗链） |
 | `contextMenus` | 右键菜单（清空本页 / 切换深度模式 / 暂停抓取 / 下载此图片） |
 | `scripting` | 仅深度搜索模式下注入 MAIN world 脚本（`js/injected-search.js`），用于发现动态拼接的媒体 URL |
+| `sidePanel` | 侧边栏面板（与弹窗共用 `popup.html`，可从浏览器侧边栏常驻打开） |
 | `host_permissions: <all_urls>` | 让 webRequest 观察到 CDN 等第三方域名媒体 |
 
-> `minimum_chrome_version: 111`（`scripting.executeScript` 的 `world:'MAIN'` 需要 111+）。
+> `minimum_chrome_version: 114`（`scripting.executeScript` 的 `world:'MAIN'` 需 111+，侧边栏需 114+）。
 
 ---
 

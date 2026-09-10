@@ -184,6 +184,25 @@
           <span class="hint">默认<b>关闭</b>：直接保存到浏览器默认下载目录（批量下载更顺畅）。开启后每次下载都会询问保存位置。</span>
         </span>
       </label>
+
+      <div style="margin-top:16px;">
+        <label style="font-size:13px;font-weight:600;">下载文件名模板（留空 = 保持原文件名）</label>
+        <input type="text" id="fileNameTemplate" placeholder="例：${title}/${fileName}.${ext}" style="margin-top:6px;">
+        <p class="hint" style="margin-top:5px;">
+          可用变量：<code>${title}</code> 页面标题 · <code>${ext}</code> 扩展名 · <code>${date}</code> 日期 ·
+          <code>${time}</code> 时间 · <code>${fileName}</code> 原文件名 · <code>${host}</code> 域名 · <code>${type}</code> 类型<br>
+          支持子目录（如 <code>${title}/${fileName}.${ext}</code>，会自动建文件夹）。
+        </p>
+      </div>
+
+      <div style="margin-top:16px;">
+        <label style="font-size:13px;font-weight:600;">aria2 RPC 地址（留空 = 不启用「发送到 aria2」按钮）</label>
+        <input type="text" id="aria2Rpc" placeholder="http://127.0.0.1:6800/jsonrpc" style="margin-top:6px;">
+        <p class="hint" style="margin-top:5px;">
+          若 aria2 配了密钥（<code>--rpc-secret</code>），写成
+          <code>http://127.0.0.1:6800/jsonrpc?token=你的密钥</code>。发送时会自动透传 Referer 与已捕获的鉴权头。
+        </p>
+      </div>
     </section>
   </main>
 
