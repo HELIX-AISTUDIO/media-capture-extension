@@ -7,19 +7,45 @@
 ## v0.3.3 2026-09-10
 
 ✨ 新增
-- **国际化 i18n**：支持 `zh_CN`（默认）与 `en` 两种语言，共 **193 条**界面文案
+- **国际化 i18n**：支持 `zh_CN`（默认）与 `en` 两种语言，共 **223 条**界面文案
   - 新增 `_locales/zh_CN/messages.json` + `_locales/en/messages.json`，manifest 增加 `default_locale`，`name`/`description` 改用 `__MSG_*__`
   - 新增 `js/i18n.js` 本地化器：提供 `t(key, fallback)` 与 `localizeDom()`，支持 `data-i18n` / `data-i18n-title` / `data-i18n-placeholder` / `data-i18n-html` 四种绑定
   - 语言自动跟随浏览器界面语言；添加新语言只需在 `_locales/` 下新增一个 `messages.json`
+- **标签页录制**（对应猫抓 recorder 能力，独立实现）：把**已渲染的标签页画面与声音**录成 `.webm`
+  - 新增 `recorder.html` + `js/recorder.js`；弹窗工具栏新增「录制」入口
+  - 技术路径：`chrome.tabCapture.getMediaStreamId` → `getUserMedia(tab)` → **音频回放接回 AudioContext**（否则录制期间听不到声音）→ `MediaRecorder`（vp9→vp8→webm 降级链）→ Blob → `downloads`
+  - 安全护栏：单次最长 **60 分钟**、最大 **2GB** 自动停止；页面关闭时释放 stream 与 AudioContext；`track.ended` 自动停止
+  - 两条获取 streamId 的路径（扩展页直取 + 后台兜底），失败时给出可操作指引
+  - ⚠️ 受版权保护的加密（DRM）内容会录成黑屏，属浏览器限制
+- **嗅探总开关**（对应猫抓 issue #1056）：右键扩展图标可快速「暂停 / 恢复嗅探」
+  - 右键菜单拆为**两项并按状态切换显示**（「暂停嗅探」/「恢复嗅探」，互斥可见）
+  - 暂停时**图标置灰**（`img/gray*.png`），SW 重启后自动重新应用，图标与实际状态始终一致
+  - **真停止**：`onBeforeRequest` / `onSendHeaders` / `onResponseStarted` 三处早退（不再空转）；内容脚本同步停扫（轮询 / Mutation / Intersection / 深搜 / MAIN world 桥接全部早退）
+  - 弹窗顶部新增**常驻总开关**（状态显示 + 控制），与右键菜单、快捷键状态实时同步；暂停时额外显示横幅说明「新资源不会被记录、已有列表保留」
+  - 状态持久化到 `storage.local`，浏览器重启后保持；默认运行
+  - 实现取舍：**不注销监听器**（MV3 下 SW 重启会在顶层重新注册，注销状态会丢），改用标志位早退；**不断开观察器**（重连易错），同样用标志位
 
 🔧 优化（安全设计）
 - **「中文原文即兜底」**：HTML 保留中文原文、JS 用 `t(key,'中文')` 双参调用；**任何 key 缺失时回退到中文原文**，最坏情况只显示中文，**绝不会出现空白或裸 key**
-  - 实测：真实 Chromium 无头渲染三个页面，裸 key 数 = 0、文案丢失 = 0、空元素 = 0
-- 仅 `manifest.json` 的 name/description/default_locale 三处变更；权限、`minimum_chrome_version`、`side_panel`、`options_ui`、`commands` **逐字节未动**
+  - 实测：真实 Chromium 无头渲染四个页面，裸 key 数 = 0、文案丢失 = 0、空元素 = 0
+- **暂停期间打开新页面不会漏出资源**：内容脚本的首次扫描延后到状态同步之后执行（否则会抢在状态到达前把整页资源上报，使暂停形同虚设）；恢复时补扫暂停期间新增的资源，**不丢**
+- **`addDomResources` 刻意不加暂停早退**：内容脚本在发送前即标记去重集合，若后台静默丢弃会导致该 URL 永久不再上报（永久丢资源），故只允许「暂停瞬间少量在途消息落地」
 - HTML 的 id/class/style/结构与 JS 逻辑均未改动（QA 用 git diff 逐行核对：非 i18n 改动行数 = 0）
 
+🐛 修复（独立代码审查 + 三轮 QA 复验发现）
+- **`m3u8`/`mpd` 资源在列表里完全不可见（核心功能不可达）**：v0.2.4 精简界面时删掉了「m3u8/mpd」与「全部」两个筛选标签，而 `classify()` 对 `.m3u8/.mpd` 返回 `stream` —— 该类型匹配不上「视频/图片/音频」任何标签，导致 **M3U8/DASH 解析、导出 .m3u8、分片批量下载、aria2 推送整条链路全部不可达**。现补回「流媒体」筛选标签恢复可达性
+- **解析 m3u8/mpd 不带 Referer → 防盗链站点必然 403**：`handleParseM3u8/Mpd` 的 fetch 未注入 Referer（而页面 URL 参数早已传递、只是没被使用）。现解析前注入 `purpose='download'` 的会话规则，结束后释放（成功/失败都释放）
+- **页面黑白名单对 DOM 上报路径不生效**：网络路径有 `isBlockedPageUrl` 判断，DOM 路径（`addDomResources`）没有 → 加入黑名单的站点仍会从 DOM/缓存入库。现已对齐
+- **SW 冷启动 × 弹窗首帧可能显示空列表且不自愈**：`restoreFromStorage` 是异步的，弹窗首次 `getResources` 可能抢在恢复回调前返回。现空列表时自动补拉一次
+- **暂停态下打开新页面可能漏出首扫**：内容脚本的首次扫描原为「状态同步超时即乐观执行」，在「已暂停 + SW 冷启动 >300ms」时会先按运行态上报整页资源。现改为超时只告警、由状态回调决定（回调最终一定会到达，不影响正确性）
+- **录制快速双击会并发起两条流**：`recording` 守卫在取流之后才置位。现引入「连接中」锁覆盖该窗口，并逐个检查所有退出路径确保解锁
+- 清理死代码：`bumpEpoch` / `removeResource`（background）、`isMediaUrl` / `isStreamUrl` / `isMediaMime` / `getUserRules` / `MEDIA_EXT_RE`（media-parser）—— 经全仓库 grep 确认零调用
+
 📝 更新
-- 版本号 0.3.2 → 0.3.3（**无新增权限**）
+- 版本号 0.3.2 → 0.3.3
+- **权限变更**：新增 `tabCapture`（标签页录制所需）；其余权限、`minimum_chrome_version`、`side_panel`、`options_ui`、`commands` **逐字节未动**
+- **文档与实现对齐**：`PRIVACY.md` 权限表补齐为 10 项、补充「鉴权头在本地捕获且仅用于本地请求头注入、绝不上传」与三类存储（local/sync/session）说明、新增录制功能隐私说明；`README.md` 补 `tabCapture` 行、删除与项目红线冲突的迭代项（在线 ffmpeg 合并＝永不采用）；`docs/PROJECT_ARCH.md` 目录树补齐
+- 新增暂停态图标 `img/gray16/48/128.png`；`js/utils/generate_icons.py` 改为同时生成运行态与暂停态图标（并修正其目录路径，此前脚本因目录重构会写到错误位置）
 - 说明：`js/options.js` 的 aria2 保存异常由「静默忽略」改为「显示保存失败提示」；`js/viewer.js` 倍速按钮新增初始化文案（中文下等价）。两处均为提示增强，不影响功能
 
 ## v0.3.2 2026-09-10

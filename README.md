@@ -59,6 +59,7 @@
 | `contextMenus` | 右键菜单（清空本页 / 切换深度模式 / 暂停抓取 / 下载此图片） |
 | `scripting` | 仅深度搜索模式下注入 MAIN world 脚本（`js/injected-search.js`），用于发现动态拼接的媒体 URL |
 | `sidePanel` | 侧边栏面板（与弹窗共用 `popup.html`，可从浏览器侧边栏常驻打开） |
+| `tabCapture` | 标签页录制：把**已渲染的**标签页画面与声音录成 `.webm`（需用户主动点击开始；录制全程在本机完成，媒体数据不离开本机） |
 | `host_permissions: <all_urls>` | 让 webRequest 观察到 CDN 等第三方域名媒体 |
 
 > `minimum_chrome_version: 114`（`scripting.executeScript` 的 `world:'MAIN'` 需 111+，侧边栏需 114+）。
@@ -72,9 +73,11 @@
 ```
 edge_media_catch_ext/
 ├── manifest.json                 # 扩展清单（MV3，权限最小化）
-├── popup.html                    # 弹窗页面
+├── popup.html                    # 弹窗页面（同时作为侧边栏 side_panel）
 ├── viewer.html                   # 媒体查看器页面
+├── recorder.html                 # 标签页录制页面
 ├── options.html                  # 规则设置页（四张规则表）
+├── _locales/                     # 国际化语言包（zh_CN 默认 / en）
 ├── css/
 │   └── popup.css                 # 弹窗样式
 ├── js/
@@ -84,12 +87,14 @@ edge_media_catch_ext/
 │   ├── mpd-parser.js             # DASH/MPD 解析器
 │   ├── content.js                # 内容脚本：DOM 扫描 + 深度搜索 + 缓存捕捉 + MAIN world 桥接
 │   ├── injected-search.js        # 深度模式注入脚本（MAIN world）：钩 fetch/XHR 发现媒体 URL
+│   ├── i18n.js                   # 轻量本地化器（中文原文即兜底）
 │   ├── popup.js                  # 弹窗逻辑：筛选/排序/预览/解析/导出/批量下载
 │   ├── options.js                # 规则设置页逻辑
 │   ├── viewer.js                 # 查看器逻辑：鉴权头注入 + 内嵌播放 + Blob 下载通道
+│   ├── recorder.js               # 标签页录制逻辑（tabCapture → MediaRecorder → .webm）
 │   └── utils/
 │       └── generate_icons.py     # 图标生成脚本（纯 Python 标准库）
-├── img/                          # 扩展图标 icon16/48/128.png
+├── img/                          # 扩展图标 icon16/48/128.png + gray16/48/128.png
 ├── lib/                          # 第三方库目录（当前为空，供后续按需引入）
 ├── docs/
 │   ├── LEARNINGS.md              # 猫抓源码学习沉淀
@@ -102,14 +107,14 @@ edge_media_catch_ext/
 
 ## 下一版本迭代清单
 
-
 1. 接入 `m3u8dl://` 自定义协议，唤起本地下载工具（N_m3u8DL-CLI）。
-2. 在线 ffmpeg 分片合并（可选后端）。
-3. DevTools 面板深度捕获。
-4. 自定义域名 / 扩展名 / 正则规则与屏蔽列表。
-5. 请求头透传（Referer/Cookie）以解决更多防盗链。
-6. 资源导出 JSON/CSV。
-7. 深色模式。
+2. DevTools 面板深度捕获。
+3. 资源导出 JSON / CSV。
+4. 深色模式。
+
+> 🔴 红线（**永不采用**）：在线 ffmpeg / ffmpeg.wasm 分片合并；图片网格面板。
+>
+> 已完成并移出本清单：自定义域名 / 扩展名 / 正则规则与屏蔽列表（v0.2.6 起由 options 页提供）；请求头透传（Referer / Cookie，v0.3.x 起由 DNR 注入实现）。
 
 ---
 

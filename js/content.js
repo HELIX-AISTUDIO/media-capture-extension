@@ -22,6 +22,10 @@ const reported = new Set(); // 本次页面生命周期内已上报 URL 去重
 // 抓取模式：'default' 过滤垃圾 / 'deep' 全部抓取（由 popup 经后台同步）
 let captureMode = 'default';
 
+// 嗅探总开关的暂停态（由后台的 setPaused 消息 / 启动时的 getCaptureState 同步）。
+// 暂停时：所有上报与扫描入口一律早退，真正省 CPU（不只是"报了再丢"）。
+let sniffPaused = false;
+
 // 图片尺寸阈值
 const MIN_IMG_EDGE = 120;
 const MIN_IMG_AREA = 120 * 120;
@@ -60,6 +64,10 @@ function isMeaningfulImage(img) {
 }
 
 function reportResources(items) {
+  // 暂停开关：暂停期间一律不上报。
+  // 注意守卫放在最前面（在写入 reported 去重集合之前），这样暂停期间发现的资源
+  // 不会被标记为「已上报」，恢复后还能正常重新上报，不会永久漏掉。
+  if (sniffPaused) return;
   const fresh = (items || []).filter((it) => {
     if (!it || !it.url || reported.has(it.url)) return false;
     reported.add(it.url);
@@ -78,6 +86,10 @@ function reportResources(items) {
 
 // ---------- 劫持 HTMLMediaElement.prototype.src ----------
 let srcPatched = false;
+// 注：此处刻意**不**加 sniffPaused 早退。劫持是一次性开销（改全局原型），
+// 若因暂停跳过劫持，页面在暂停期间加载完就永远不再劫持（srcPatched 未置位也没人重调），
+// 会留下状态相关的初始化空洞。保留劫持、让 setter 走 reportResources 的守卫即可，
+// 暂停时的额外成本仅一次字符串判断。
 function patchMediaSrc() {
   if (srcPatched) return;
   try {
@@ -181,6 +193,7 @@ function scanPerformance() {
 let deepSearchDone = false;
 function deepSearch() {
   if (captureMode !== 'deep') return; // 脚本深搜仅在「深度搜索模式」执行，默认模式保持干净
+  if (sniffPaused) return;            // 暂停期间不扫描（本就最耗 CPU 的入口之一）
   if (deepSearchDone) return;
   deepSearchDone = true;
   const out = [];
@@ -213,6 +226,7 @@ window.addEventListener('message', (ev) => {
     if (ev.source !== window) return;
     const d = ev.data;
     if (!d || d.__mcMediaFound !== true || !Array.isArray(d.urls)) return;
+    if (sniffPaused) return;            // 暂停期间丢弃 MAIN world 桥接来的深搜结果
     if (captureMode !== 'deep') return;
     const items = d.urls
       .filter((u) => typeof u === 'string' && isHttpUrl(u))
@@ -222,14 +236,39 @@ window.addEventListener('message', (ev) => {
 });
 
 // ---------- 初次扫描 ----------
-reportResources(scanMedia().concat(scanImages()).concat(scanPerformance()));
+// ⚠️ 必须延后到「暂停状态同步完成」之后再扫描：内容脚本是异步向后台查状态的，
+// 若在这里立即扫描，页面在暂停期间被打开/刷新时，首次扫描会抢在状态同步之前
+// 把整页资源报上去（那时脚本还不知道自己处于暂停态）→ 暂停形同虚设。
+// 因此包成函数，只由下方 getCaptureState 的回调触发。
+let initialScanDone = false;
+function runInitialScan() {
+  if (initialScanDone) return;
+  initialScanDone = true;
+  reportResources(scanMedia().concat(scanImages()).concat(scanPerformance()));
+}
+
+// 300ms 兜底：若状态回调仍未到达，**只记录告警，不扫描、不上报、也不置 initialScanDone**。
+// 为什么兜底不能"乐观扫一次"：getCaptureState 的回调最终一定会到达（成功走回调；
+// 失败/异常也走回调，按「运行中」处理），所以这里不需要抢跑——抢跑反而会在
+// 「已暂停 + SW 冷启动 >300ms」时先按运行态把整页资源报上去（漏出首扫）。
+// 兜底只用于避免"永久静默"：留一条 warn 便于排查。
+// 兜底跳过不会永久漏资源：即便状态查询彻底失败，回调分支仍会触发首扫，
+// 且 2s 轮询与 MutationObserver 也会自然补上。
+setTimeout(() => {
+  if (initialScanDone) return;
+  console.warn('[content] 暂停状态同步 300ms 内未返回，暂缓首扫，等回调到达后再决定（避免暂停态漏出首扫）');
+}, 300);
 
 // ---------- MutationObserver：捕获懒加载/动态插入 ----------
 let pending = null;
 new MutationObserver(() => {
+  // 暂停期间直接跳过：不排队、不做 scanMedia/scanImages（DOM 全量查询是本脚本的大头开销）。
+  // 用标志位早退而不是 disconnect —— 观察器重连逻辑复杂易错，且断连期间的结构变化会丢。
+  if (sniffPaused) return;
   if (pending) return;
   pending = setTimeout(() => {
     pending = null;
+    if (sniffPaused) return;   // 排队期间可能被暂停，落地前再确认一次
     reportResources(scanMedia().concat(scanImages()));
   }, 500);
 }).observe(document.documentElement, {
@@ -240,6 +279,8 @@ new MutationObserver(() => {
 // ---------- IntersectionObserver：图片进入视口才抓 ----------
 try {
   const io = new IntersectionObserver((entries) => {
+    // 暂停期间早退（同样不 disconnect：断连后新插入的懒加载图片就没人重新 observe 了）。
+    if (sniffPaused) return;
     const items = [];
     for (const e of entries) {
       if (e.isIntersecting && e.target.complete && e.target.naturalWidth) {
@@ -260,6 +301,10 @@ try {
     if (!img.complete || !img.naturalWidth) io.observe(img);
   });
 
+  // 这个 MutationObserver 只负责「把新插入的未加载图片登记进 IntersectionObserver」，
+  // 不做任何扫描与上报（无 CPU 大头）。因此**刻意不加** sniffPaused 早退：
+  // 若暂停期间跳过登记，这些图片之后既不会被 IO 观察（无重连逻辑），
+  // 白白丢掉观察资格；保持登记的成本极低，且恢复后 IO 会正常触发。
   new MutationObserver((mutations) => {
     mutations.forEach((m) => {
       m.addedNodes.forEach((node) => {
@@ -277,6 +322,8 @@ try {
 // ---------- 轮询兜底（节流：2 秒一次） ----------
 let scanTick = 0;
 setInterval(() => {
+  // 暂停期间直接跳过本轮（本 tick 每 2 秒跑一次全量 DOM 查询，是常驻 CPU 大头）
+  if (sniffPaused) return;
   scanTick++;
   reportResources(scanMedia().concat(scanImages()));
   // 每 5 次（约 10 秒）做一次 performance 扫描，捕捉新缓存资源
@@ -306,6 +353,21 @@ try {
   });
 } catch (e) { /* 扩展上下文失效时忽略 */ }
 
+// 启动时向后台读取「暂停/恢复」状态（复用已有的 getCaptureState 消息，不新增消息类型）。
+// 失败时按「运行中」处理（默认值 sniffPaused=false 即为运行中）。
+try {
+  chrome.runtime.sendMessage({ action: 'getCaptureState' }, (resp) => {
+    if (!chrome.runtime.lastError && resp && resp.ok && resp.enabled === false) {
+      sniffPaused = true;
+    }
+    // 拿到状态后再做初次扫描：暂停时不发、恢复时照常发（守卫在 reportResources 内）
+    runInitialScan();
+  });
+} catch (e) {
+  // 扩展上下文失效：按运行中处理，并照常做初次扫描
+  runInitialScan();
+}
+
 // 监听后台/弹窗下发的模式切换与重扫指令
 try {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -321,6 +383,19 @@ try {
       reported.clear();
       // 立即重扫媒体与图片（缓存捕捉由常规轮询兜底）
       reportResources(scanMedia().concat(scanImages()));
+      return;
+    }
+    // 嗅探总开关：后台状态变化后广播下来（暂停/恢复）。
+    // 只新增分支，不改动既有的 setMode / rescan 行为。
+    if (msg.action === 'setPaused') {
+      const next = msg.paused === true;
+      if (next === sniffPaused) return;   // 状态未变，无需动作
+      sniffPaused = next;
+      if (!sniffPaused) {
+        // 恢复：立即补一次扫描。暂停期间 reportResources 是「在最前面早退」，
+        // 资源没有被写进 reported 去重集合，所以这里能正常补报，不会永久漏抓。
+        reportResources(scanMedia().concat(scanImages()));
+      }
       return;
     }
   });

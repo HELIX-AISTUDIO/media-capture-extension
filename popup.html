@@ -8,9 +8,16 @@
 <body data-page-node-id="pboiH8Q0BQeqmFIGXvhrEr">
   <header data-page-node-id="GYvRzPNifByvLkOYLis1Rp">
     <h1 data-i18n="popup_title" data-page-node-id="JxQXC5LtaOC70TGBWujGid">网页媒体抓取器 <span id="count" class="count" data-page-node-id="1GYFjhiGPaEdMIro6Ck9S3"></span></h1>
+    <div class="switcher" id="switchBar" data-page-node-id="switchBar01x">
+      <label class="switch-label" title="暂停 / 恢复嗅探（等同于右键菜单与快捷键）" data-i18n-title="popup_switch_title" data-page-node-id="switchLabel01x">
+        <input type="checkbox" id="sniffToggle" checked data-page-node-id="sniffToggle01x">
+        <span id="sniffStateText" data-i18n="popup_switch_on" data-page-node-id="sniffState01x">嗅探运行中</span>
+      </label>
+    </div>
     <div class="toolbar" data-page-node-id="WrA9nZpHUHoDFvsy2ek3Z2">
       <div class="filters" data-page-node-id="cNoVAx6TEnh3WP4RqKqtp0">
         <button class="filter active" data-filter="video" data-i18n="popup_filter_video" data-page-node-id="lqiYTeBRgZDc0zUWOqxhhW">视频</button>
+        <button class="filter" data-filter="stream" data-i18n="popup_filter_stream" data-page-node-id="fltStream01x">流媒体</button>
         <button class="filter" data-filter="image" data-i18n="popup_filter_image" data-page-node-id="bPpnekLTZ9ntWBGs5ArPyc">图片</button>
         <button class="filter" data-filter="audio" data-i18n="popup_filter_audio" data-page-node-id="6iiAW0Sgzsu1jyqUhZrCfD">音频</button>
       </div>
@@ -20,6 +27,7 @@
         <button id="settings" title="规则设置（扩展名/MIME/正则/黑白名单）" data-i18n="popup_btn_settings" data-i18n-title="popup_btn_settings_title" data-page-node-id="setBtn01x">设置</button>
         <button id="autoDown" title="开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）" data-i18n="popup_btn_autodown" data-i18n-title="popup_btn_autodown_title" data-page-node-id="autoBtn01x">自动下载</button>
         <button id="export" title="导出当前筛选结果为 URL 列表（.txt，每行一条）" data-i18n="popup_btn_export" data-i18n-title="popup_btn_export_title" data-page-node-id="expBtn01x">导出</button>
+        <button id="record" title="录制当前标签页画面与声音（保存为 .webm）" data-i18n="popup_btn_record" data-i18n-title="popup_btn_record_title" data-page-node-id="recBtn01x">录制</button>
       </div>
     </div>
     <div class="searchbar" data-page-node-id="DHmMxnSeu7VNpx4ynPDxbg">

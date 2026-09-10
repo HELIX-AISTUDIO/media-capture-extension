@@ -16,7 +16,8 @@
     "declarativeNetRequest",
     "contextMenus",
     "scripting",
-    "sidePanel"
+    "sidePanel",
+    "tabCapture"
   ],
 
   "commands": {

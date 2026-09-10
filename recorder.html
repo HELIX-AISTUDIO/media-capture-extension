@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title data-i18n="recorder_title">标签页录制</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #0f1115; color: #e5e7eb;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px; padding: 24px;
+    }
+    .panel {
+      background: #1c212b; border: 1px solid #2c3340; border-radius: 12px;
+      padding: 24px 28px; width: 100%; max-width: 560px; line-height: 1.7;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    h1 { font-size: 18px; font-weight: 600; color: #e5e7eb; }
+    .row { font-size: 13px; color: #9ca3af; display: flex; gap: 8px;
+           align-items: baseline; flex-wrap: wrap; }
+    .row .value { color: #e5e7eb; word-break: break-all; }
+    .controls { display: flex; gap: 12px; }
+    button {
+      background: #2563eb; color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 14px; cursor: pointer;
+    }
+    button.ghost { background: #1f2937; color: #e5e7eb; }
+    button:hover { opacity: .88; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    #status { font-size: 13px; color: #34d399; min-height: 20px; }
+    #status.error { color: #f87171; }
+    .hint { font-size: 12px; color: #6b7280; line-height: 1.6; }
+    .hint.warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1 data-i18n="recorder_heading">标签页录制</h1>
+    <div class="row">
+      <span data-i18n="recorder_target_label">目标标签页：</span>
+      <span class="value" id="tabTitle" data-i18n="recorder_tab_loading">读取中…</span>
+    </div>
+    <div class="controls">
+      <button id="startBtn" data-i18n="recorder_btn_start">开始录制</button>
+      <button class="ghost" id="stopBtn" data-i18n="recorder_btn_stop" disabled>停止录制</button>
+    </div>
+    <div id="status" data-i18n="recorder_status_idle">未开始</div>
+    <div class="row">
+      <span data-i18n="recorder_tracks_label">音视频轨道：</span>
+      <span class="value" id="trackInfo">—</span>
+    </div>
+    <p class="hint warn" data-i18n="recorder_hint">本功能录制标签页当前画面与声音；受版权保护的加密（DRM）内容会录成黑屏，这是浏览器限制。</p>
+    <p class="hint" data-i18n="recorder_limit_hint">单次录制最长 60 分钟，或文件达到 2GB 时，会自动停止。</p>
+  </div>
+  <script src="js/i18n.js"></script>
+  <script src="js/recorder.js"></script>
+</body>
+</html>

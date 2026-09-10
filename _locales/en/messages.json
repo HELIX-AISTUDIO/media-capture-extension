@@ -39,6 +39,10 @@
     "message": "Audio",
     "description": "Filter: audio"
   },
+  "popup_filter_stream": {
+    "message": "Streams",
+    "description": "Filter: stream"
+  },
   "popup_btn_refresh": {
     "message": "Refresh",
     "description": "Refresh button"
@@ -176,8 +180,20 @@
     "description": "Unknown size"
   },
   "popup_pause_banner": {
-    "message": "⏸ Capture paused — use the context menu or the \"Pause / Resume capture\" shortcut to resume",
+    "message": "⏸ Sniffing is paused: new resources won't be recorded (the existing list is kept). Use the switch above to resume anytime.",
     "description": "Capture paused banner"
+  },
+  "popup_switch_title": {
+    "message": "Pause / resume sniffing (same as the context menu and the shortcut)",
+    "description": "Sniffing master switch tooltip"
+  },
+  "popup_switch_on": {
+    "message": "Sniffing active",
+    "description": "Sniffing master switch on"
+  },
+  "popup_switch_off": {
+    "message": "Sniffing paused",
+    "description": "Sniffing master switch off"
   },
   "popup_decor_label": {
     "message": "Decorative",
@@ -770,5 +786,113 @@
   "options_aria2_saved": {
     "message": "aria2 configuration saved",
     "description": "aria2 saved"
+  },
+  "popup_btn_record": {
+    "message": "Record",
+    "description": "Record button"
+  },
+  "popup_btn_record_title": {
+    "message": "Record the current tab's screen and audio (saved as .webm)",
+    "description": "Record button tooltip"
+  },
+  "recorder_title": {
+    "message": "Tab recorder",
+    "description": "Recorder page title"
+  },
+  "recorder_heading": {
+    "message": "Tab recorder",
+    "description": "Recorder heading"
+  },
+  "recorder_target_label": {
+    "message": "Target tab:",
+    "description": "Target tab label"
+  },
+  "recorder_tab_loading": {
+    "message": "Loading…",
+    "description": "Tab info loading"
+  },
+  "recorder_tab_unknown": {
+    "message": "(Unable to read tab info)",
+    "description": "Tab info unknown"
+  },
+  "recorder_tab_untitled": {
+    "message": "(Untitled)",
+    "description": "Tab untitled"
+  },
+  "recorder_btn_start": {
+    "message": "Start recording",
+    "description": "Start recording button"
+  },
+  "recorder_btn_stop": {
+    "message": "Stop recording",
+    "description": "Stop recording button"
+  },
+  "recorder_status_idle": {
+    "message": "Not started",
+    "description": "Status idle"
+  },
+  "recorder_status_connecting": {
+    "message": "Acquiring the tab media stream…",
+    "description": "Status connecting"
+  },
+  "recorder_status_recording": {
+    "message": "Recording · $1 elapsed · $2 captured",
+    "description": "Status recording with duration and size"
+  },
+  "recorder_status_saved": {
+    "message": "Saved: $1",
+    "description": "Status saved"
+  },
+  "recorder_tracks_label": {
+    "message": "Media tracks:",
+    "description": "Media tracks label"
+  },
+  "recorder_hint": {
+    "message": "Records the tab's current display and audio; DRM-protected content is captured as a black screen — this is a browser limitation.",
+    "description": "Recorder hint about DRM"
+  },
+  "recorder_limit_hint": {
+    "message": "A single recording stops automatically at 60 minutes, or when the file reaches 2GB.",
+    "description": "Recorder limits hint"
+  },
+  "recorder_autostop_time": {
+    "message": "Reached the 60-minute limit; recording stopped automatically.",
+    "description": "Auto-stop by time"
+  },
+  "recorder_autostop_size": {
+    "message": "Reached the 2GB limit; recording stopped automatically.",
+    "description": "Auto-stop by size"
+  },
+  "recorder_err_no_tab": {
+    "message": "No target tab specified (missing tabId parameter).",
+    "description": "Error no tab id"
+  },
+  "recorder_err_streamid": {
+    "message": "Failed to get the media stream ID: $1",
+    "description": "Error getMediaStreamId"
+  },
+  "recorder_err_getusermedia": {
+    "message": "Failed to capture the tab media stream: $1. Make sure the tab is still playing/rendering content.",
+    "description": "Error getUserMedia"
+  },
+  "recorder_err_recorder": {
+    "message": "Failed to create the recorder: $1",
+    "description": "Error create MediaRecorder"
+  },
+  "recorder_err_empty": {
+    "message": "No data was captured; recording failed (the tab may have no audio/video output).",
+    "description": "Error empty recording"
+  },
+  "recorder_err_save": {
+    "message": "Failed to save: $1",
+    "description": "Error save"
+  },
+  "recorder_err_unknown": {
+    "message": "Recording failed: $1",
+    "description": "Error unknown"
+  },
+  "recorder_streamid_guide": {
+    "message": "Click the extension icon once (or open the popup once) and try again; if it still fails, this page may not be capturable.",
+    "description": "Guidance when tabCapture streamId cannot be obtained"
   }
 }

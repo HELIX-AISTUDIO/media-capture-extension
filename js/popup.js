@@ -34,9 +34,26 @@ function updatePauseBanner() {
   if (existing) return;
   const el = document.createElement('div');
   el.id = 'pauseBanner';
-  el.textContent = t('popup_pause_banner', '⏸ 抓取已暂停 — 用右键菜单或快捷键「暂停 / 恢复抓取」可恢复');
+  el.textContent = t('popup_pause_banner', '⏸ 嗅探已暂停：新资源不会被记录（已有列表保留）。用上方开关可随时恢复。');
   const list = document.getElementById('list');
   if (list && list.parentNode) list.parentNode.insertBefore(el, list);
+}
+
+// ---------- 顶部「嗅探总开关」（需求第 4 条） ----------
+// 把「后台返回的开关状态」映射到 checkbox + 状态文案 —— 单一入口，
+// 初始化渲染与点击回写都走这里，避免两处状态各写一遍导致不一致。
+// 同时驱动暂停横幅：两者共用同一个状态源 captureEnabledState。
+function applySniffSwitchUI(enabled) {
+  captureEnabledState = enabled !== false;
+  const cb = document.getElementById('sniffToggle');
+  const txt = document.getElementById('sniffStateText');
+  if (cb) cb.checked = captureEnabledState;
+  if (txt) {
+    txt.textContent = captureEnabledState
+      ? t('popup_switch_on', '嗅探运行中')
+      : t('popup_switch_off', '嗅探已暂停');
+  }
+  updatePauseBanner();
 }
 
 const TYPE_META = {
@@ -838,21 +855,29 @@ function renderParseResult(el, parsed, isMpd) {
 }
 
 // ---------- 数据读取 ----------
-function refresh() {
+// P1-2：SW 冷启动竞态自愈。restoreFromStorage() 是异步的；当本次 getResources 恰好
+// 唤醒了刚被回收的 Service Worker 时，storage 恢复回调可能晚于本消息返回，
+// 导致弹窗首帧拿到空列表且不会自动更新。此处仅在「非重试轮且结果为空」时，
+// 300ms 后补拉一次；isRetry 参数保证最多补拉一次，避免空页面陷入轮询。
+function scheduleEmptyRetry(isRetry) {
+  if (isRetry) return;
+  if (allResources.length > 0) return;
+  setTimeout(() => { refresh(true); }, 300);
+}
+
+function refresh(isRetry) {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs[0]) { resolve(); return; }
       currentTabId = tabs[0].id;
       currentTabUrl = tabs[0].url || '';
       currentTabTitle = tabs[0].title || '';   // 供文件名模板 ${title} 使用（P2-1）
-      // 读取抓取开关状态（快捷键/右键菜单可切换）
+      // 读取抓取开关状态（快捷键/右键菜单/顶部总开关均可切换）。
+      // 复用这条既有链路同时刷新「顶部总开关」与「暂停横幅」，不新增重复请求。
       try {
         chrome.runtime.sendMessage({ action: 'getCaptureState' }, (st) => {
           if (chrome.runtime.lastError) return;
-          if (st) {
-            captureEnabledState = st.enabled !== false;
-            updatePauseBanner();
-          }
+          if (st) applySniffSwitchUI(st.enabled);
         });
       } catch (e) { /* ignore */ }
       loadAutoDown();   // 同步自动下载开关的按钮态
@@ -860,6 +885,7 @@ function refresh() {
         if (chrome.runtime.lastError) {
           allResources = [];
           render();
+          scheduleEmptyRetry(isRetry);
           resolve();
           return;
         }
@@ -869,6 +895,7 @@ function refresh() {
           if (!stillThere) closePreview();
         }
         render();
+        scheduleEmptyRetry(isRetry);
         resolve();
       });
     });
@@ -951,6 +978,28 @@ document.getElementById('clear').addEventListener('click', () => {
 // 设置按钮：打开规则设置页（options.html，扩展名/MIME/正则/黑白名单四表）
 document.getElementById('settings').addEventListener('click', () => {
   try { chrome.runtime.openOptionsPage(); } catch (e) { /* ignore */ }
+});
+
+// 录制按钮（P2-6）：打开录制页 recorder.html，录制当前标签页画面与声音。
+// 未取到标签页 id 时不做任何事（防错）。
+document.getElementById('record').addEventListener('click', () => {
+  if (!currentTabId) return;
+  chrome.tabs.create({ url: chrome.runtime.getURL('recorder.html') + '?tabId=' + currentTabId });
+});
+
+// ---------- 顶部总开关：点击写入后台（setCaptureState） ----------
+// 关键：必须以「后台响应里的 enabled」回写 UI，而不是本地勾选态——
+// 否则一旦写入失败（比如 SW 刚重启、消息丢失），UI 会与真实状态脱钩。
+document.getElementById('sniffToggle').addEventListener('change', (e) => {
+  const desired = !!(e.target && e.target.checked);
+  chrome.runtime.sendMessage({ action: 'setCaptureState', on: desired }, (resp) => {
+    if (chrome.runtime.lastError || !resp || !resp.ok) {
+      // 写入失败：回滚到「已知的权威状态」，避免出现"勾选已变但实际没变"的假象
+      applySniffSwitchUI(captureEnabledState);
+      return;
+    }
+    applySniffSwitchUI(resp.enabled);
+  });
 });
 
 // ---------- 自动下载开关（P1-4，按 tab 绑定） ----------

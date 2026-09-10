@@ -329,17 +329,76 @@ function applyFileNameTemplate(tpl, info) {
 
 // ---------- 抓取开关（暂停/恢复） ----------
 // 供快捷键 / 右键菜单控制：暂停时不再往列表里写入新资源（已有列表保留）。
+// 语义：暂停 = 不抓取任何**新**资源；已抓到的列表与已捕获数据一律保留、不清空。
 let captureEnabled = true;
-try {
-  chrome.storage.local.get('captureEnabled', (r) => {
-    if (!chrome.runtime.lastError && r && r.captureEnabled === false) captureEnabled = false;
-  });
-} catch (e) { /* ignore */ }
 
+// 运行态图标资源：彩色 = 正在嗅探，灰色 = 已暂停（灰色图由 js/utils/generate_icons.py 生成）
+const ICON_ON = { 16: 'img/icon16.png', 48: 'img/icon48.png', 128: 'img/icon128.png' };
+const ICON_OFF = { 16: 'img/gray16.png', 48: 'img/gray48.png', 128: 'img/gray128.png' };
+
+// 按当前开关状态切换扩展工具栏图标。
+// 为什么每处状态变更都要调它：SW 会在任意时刻被回收，重启后图标不会自动保持，
+// 必须在「状态落地处」显式重设，否则会出现「实际已暂停但图标仍是彩色」的错配。
+function applyActionIcon() {
+  try {
+    if (!chrome.action || typeof chrome.action.setIcon !== 'function') return;
+    chrome.action.setIcon({ path: captureEnabled ? ICON_ON : ICON_OFF }, () => void chrome.runtime.lastError);
+  } catch (e) { console.warn('[SW] applyActionIcon failed:', String(e && e.message || e)); }
+}
+
+// 用「菜单项可见性」反映当前状态：运行中只显示「暂停嗅探」，已暂停只显示「恢复嗅探」。
+// contextMenus.update 是异步的，且 SW 冷启动时菜单可能尚未创建完成 —— 失败只吞掉并 warn，绝不抛。
+function syncSniffMenu() {
+  try {
+    if (!chrome.contextMenus || typeof chrome.contextMenus.update !== 'function') return;
+    const onResult = () => {
+      if (chrome.runtime.lastError) {
+        // 菜单项尚未创建（冷启动早期）属正常情况，warn 仅用于排查
+        console.warn('[SW] syncSniffMenu:', chrome.runtime.lastError.message);
+      }
+    };
+    chrome.contextMenus.update('mc-pause-sniff', { visible: captureEnabled }, onResult);
+    chrome.contextMenus.update('mc-resume-sniff', { visible: !captureEnabled }, onResult);
+  } catch (e) { console.warn('[SW] syncSniffMenu failed:', String(e && e.message || e)); }
+}
+
+// 把暂停/恢复状态广播给所有已注入的 content script（让它们停止/恢复扫描）。
+// 很多 tab 没有 content script（chrome://、扩展页、未授权页），sendMessage 会置 lastError，必须吞掉。
+function broadcastPaused() {
+  try {
+    chrome.tabs.query({}, (tabs) => {
+      if (chrome.runtime.lastError) return;
+      for (const t of tabs) {
+        if (!t || t.id == null) continue;
+        try {
+          chrome.tabs.sendMessage(t.id, { action: 'setPaused', paused: !captureEnabled },
+            () => void chrome.runtime.lastError);
+        } catch (e) { /* 个别 tab 不可达，忽略 */ }
+      }
+    });
+  } catch (e) { console.warn('[SW] broadcastPaused failed:', String(e && e.message || e)); }
+}
+
+// 状态落地的唯一入口：内存标志 + 持久化 + 图标 + 右键菜单 + 广播。
+// 集中在一处是为了避免「新增一条改变状态的路径却漏调图标/菜单同步」这类错配。
 function setCaptureEnabled(v) {
   captureEnabled = v !== false;
   try { chrome.storage.local.set({ captureEnabled }, () => void chrome.runtime.lastError); } catch (e) { /* ignore */ }
+  applyActionIcon();
+  syncSniffMenu();
+  broadcastPaused();
 }
+
+// 启动时读取上次保存的开关状态。读完后必须同步刷新图标与菜单可见性，
+// 否则 SW 重启后会出现「图标退回彩色 / 菜单项与真实状态不符」。
+try {
+  chrome.storage.local.get('captureEnabled', (r) => {
+    if (chrome.runtime.lastError) return;
+    if (r && r.captureEnabled === false) captureEnabled = false;
+    applyActionIcon();
+    syncSniffMenu();
+  });
+} catch (e) { /* ignore */ }
 
 // 启动时读取上次保存的抓取模式
 try {
@@ -376,11 +435,6 @@ safeOn(chrome.runtime, 'onConnect', (port) => {
 });
 
 // ---------- 页面代数 & 导航清理 ----------
-// 递增页面代数：导航/SPA 切换后，旧代数发起的请求会被识别为"残留"而丢弃。
-function bumpEpoch(tabId) {
-  pageEpoch.set(tabId, (pageEpoch.get(tabId) || 0) + 1);
-}
-
 // 页面导航/SPA 切换：清空本 tab 数据 + 递增代数（只影响本 tab，不干扰其他 tab）
 function resetTabForNavigation(tabId) {
   // 修复「二次导航起代数拦截失效」：
@@ -457,16 +511,6 @@ function storeResource(tabId, resource) {
   }
   updateBadge(tabId);
   schedulePersist(tabId);
-}
-
-// 移除单条资源（用于"过滤不通过时撤销已有条目"）
-function removeResource(tabId, url) {
-  const map = store.get(tabId);
-  if (!map) return;
-  if (map.delete(normalizeUrl(url))) {
-    updateBadge(tabId);
-    schedulePersist(tabId);
-  }
 }
 
 // 刷新活跃 tab 缓存（仅一次 tabs.query，在 tab 切换/关闭/窗口切换时调用）
@@ -1015,6 +1059,12 @@ const REQUEST_GEN_MAX = 10000;
 safeOn(chrome.webRequest, 'onBeforeRequest', (details) => {
   const { tabId } = details;
   if (tabId < 0) return; // 后台请求无归属 tab，忽略
+  // 暂停嗅探：最外层早退，省掉后续全部记账开销（真正省性能，不只是"抓到了再丢"）。
+  // ⚠️ 取舍说明：这里刻意用「标志位早退」而不是 removeListener 注销监听器——
+  // MV3 下 SW 每次被唤醒/重启都会在顶层重新注册监听器，注销状态无法跨重启保持，
+  // 一旦注销后就再也不会恢复注册，反而更脆弱（会彻底停止嗅探）。用标志位早退
+  // 每次最多一次布尔判断，是 MV3 官方推荐的开关做法。
+  if (!captureEnabled) return;
   // 总量熔断：超过阈值直接清空兜底。代价是被清掉的在途请求 reqGen 变
   // undefined，会跳过代数校验（最坏混入少量旧页面资源），但换来 Map 不再
   // 无限增长；正常浏览远达不到 10000，属于纯兜底。
@@ -1035,6 +1085,9 @@ const X_AUTH_KEYWORD_REG = /(auth|token|sign|key|ticket|session)/i;
 const REQUEST_AUTH_MAX = 10000;
 
 safeOn(chrome.webRequest, 'onSendHeaders', (details) => {
+  // 暂停嗅探：最外层早退，省掉请求头解析与两个暂存 Map 的写入（与 onBeforeRequest 同理，
+  // 用标志位而非注销监听器——理由见 onBeforeRequest 上方说明）。
+  if (!captureEnabled) return;
   if (details.tabId < 0) return;
 
   // 1) referer 单独暂存（防盗链主链路，已有熔断 + 防泄漏）
@@ -1140,6 +1193,9 @@ safeOn(chrome.webRequest, 'onResponseStarted', (details) => {
 }, { urls: ['<all_urls>'] }, ['responseHeaders']);
 
 // ---------- 监听请求失败：清理暂存 ----------
+// ⚠️ 这里**刻意不加** captureEnabled 早退：它只做 Map 清理，不加任何采集。
+// 若加了早退，暂停期间在途请求的 requestGen / requestReferer / requestAuthHeaders
+// 就没人删，反而造成残留泄漏。
 safeOn(chrome.webRequest, 'onErrorOccurred', (details) => {
   requestGen.delete(details.requestId);
   requestReferer.delete(details.requestId);
@@ -1176,7 +1232,8 @@ function runCommands(command, tab) {
     } catch (e) { /* ignore */ }
     return;
   }
-  // 暂停 / 恢复抓取
+  // 暂停 / 恢复抓取（快捷键路径）。走 setCaptureEnabled 统一落地，
+  // 图标、右键菜单可见性、content script 广播都在其中完成。
   if (command === 'toggleCapture') {
     setCaptureEnabled(!captureEnabled);
   }
@@ -1194,8 +1251,15 @@ function buildContextMenus() {
       if (chrome.runtime.lastError) return;
       chrome.contextMenus.create({ id: 'mc-clear', title: '清空本页抓取资源', contexts: ['page', 'action'] });
       chrome.contextMenus.create({ id: 'mc-deepSearch', title: '切换深度搜索模式', contexts: ['page', 'action'] });
-      chrome.contextMenus.create({ id: 'mc-toggleCapture', title: '暂停 / 恢复抓取', contexts: ['page', 'action'] });
+      // 嗅探开关拆成两项、按状态二选一显示（比单一项「暂停/恢复」更直观：
+      // 用户一眼就知道当前处于哪种状态、点击会发生什么）。
+      // 初始 visible 按当前状态给，随后再由 syncSniffMenu() 统一校正。
+      chrome.contextMenus.create({ id: 'mc-pause-sniff', title: '暂停嗅探', contexts: ['page', 'action'], visible: captureEnabled });
+      chrome.contextMenus.create({ id: 'mc-resume-sniff', title: '恢复嗅探', contexts: ['page', 'action'], visible: !captureEnabled });
       chrome.contextMenus.create({ id: 'mc-saveImage', title: '用媒体抓取器下载此图片', contexts: ['image'] });
+      // 菜单创建完成后立刻校正一次可见性（启动时的 storage 读取可能早于或晚于本函数，
+      // 两边都调 syncSniffMenu 是幂等的，能覆盖任意时序）
+      syncSniffMenu();
     });
   } catch (e) { console.warn('[SW] buildContextMenus failed:', String(e && e.message || e)); }
 }
@@ -1220,6 +1284,11 @@ safeOn(chrome.contextMenus, 'onClicked', (info, tab) => {
       } catch (e) { /* ignore */ }
       return;
     }
+    // 嗅探开关：两项菜单按状态二选一，点击后明确置为目标状态（而不是 toggle），
+    // 避免「菜单状态与实际状态因时序错配」时出现点击结果与预期相反。
+    // 两项都走 setCaptureEnabled → 内部统一刷新图标 / 菜单可见性 / 广播。
+    if (info.menuItemId === 'mc-pause-sniff') { setCaptureEnabled(false); return; }
+    if (info.menuItemId === 'mc-resume-sniff') { setCaptureEnabled(true); return; }
     const map = { 'mc-clear': 'clear', 'mc-deepSearch': 'deepSearch', 'mc-toggleCapture': 'toggleCapture' };
     const cmd = map[info.menuItemId];
     if (cmd) runCommands(cmd, tab);
@@ -1358,6 +1427,40 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
     case 'getCaptureState': {
       sendResponse({ ok: true, enabled: captureEnabled });
       break;
+    }
+
+    // 抓取开关写入（popup 顶部总开关）。复用 setCaptureEnabled 这个「唯一落地入口」，
+    // 一次调用即完成：内存标志 + 持久化 + 图标 + 右键菜单可见性 + 向所有 tab 广播 setPaused。
+    case 'setCaptureState': {
+      const on = msg.on !== false;
+      setCaptureEnabled(on);
+      // 以「实际落地后的值」回包，供 popup 以响应为准回写 UI（而不是只信本地勾选态）
+      sendResponse({ ok: true, enabled: captureEnabled });
+      break;
+    }
+
+    // 录制 streamId 后台兜底（P2-6）：某些 Chrome 版本要求 getMediaStreamId 的调用
+    // 发生在 Service Worker 侧；recorder 页直接调用失败时走这里再试一次。
+    case 'getTabStreamId': {
+      const tabId = msg.tabId;
+      if (tabId == null || tabId < 0) { sendResponse({ ok: false, error: 'no_tab' }); break; }
+      try {
+        if (!chrome.tabCapture || typeof chrome.tabCapture.getMediaStreamId !== 'function') {
+          sendResponse({ ok: false, error: 'unsupported' });
+          break;
+        }
+        chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ ok: false, error: 'capture_failed', message: chrome.runtime.lastError.message });
+          } else {
+            sendResponse({ ok: true, streamId });
+          }
+        });
+        return true;   // 异步：保持消息通道打开直到回调返回
+      } catch (e) {
+        sendResponse({ ok: false, error: 'exception', message: String(e && e.message || e) });
+        break;
+      }
     }
 
     // 按 tab 自动下载开关（P1-4）
@@ -1540,6 +1643,14 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
 
     case 'addDomResources': {
       const tabId = msg.tabId ?? sender.tab?.id;
+      // P1-1：页面级黑白名单（blockUrl）对 DOM 上报路径同样生效。
+      // 网络路径用 details.initiator 判定，DOM 路径没有 initiator，改用 sender.tab.url；
+      // 与网络路径同款策略：拿不到页面 URL 就不拦（宁可不判，不误伤）。
+      const domPageUrl = (sender && sender.tab && sender.tab.url) || null;
+      if (domPageUrl && isBlockedPageUrl(domPageUrl)) {
+        sendResponse({ ok: true });
+        break;
+      }
       (msg.items || []).forEach((it) => {
         if (!it || !it.url) return;
         // 追踪/日志接口（data.bilibili.com/log 等）一律不收——
@@ -1586,11 +1697,19 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
 // ---------- m3u8 解析处理 ----------
 function handleParseM3u8(msg, sendResponse) {
   const url = msg.url;
-  fetch(url, {
+  // P1-3：防盗链站点的播放列表请求不带 Referer 会 403。popup 已把页面 URL 通过
+  // pageUrl 传入，这里复用它注入 Referer。规则属「下载类」注入，复用既有 DNR 分账
+  // （purpose='download'，与下载/自动下载同一账本），解析结束（成功/失败）后释放。
+  const hasPageUrl = !!msg.pageUrl;
+  const rulePromise = hasPageUrl
+    ? setPreviewRefererRule(url, { referer: msg.pageUrl }, 'download')
+    : Promise.resolve(false);
+  // 链式：先等规则写入完成，再发起 fetch（保证首个请求就带 Referer）
+  rulePromise.catch(() => false).then(() => fetch(url, {
     credentials: 'include',
     referrerPolicy: 'no-referrer-when-downgrade',
     headers: { 'Accept': '*/*' }
-  }).then((resp) => {
+  })).then((resp) => {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return resp.text();
   }).then((text) => {
@@ -1608,16 +1727,28 @@ function handleParseM3u8(msg, sendResponse) {
     });
   }).catch((err) => {
     sendResponse({ ok: false, error: 'parse_failed', message: String(err && err.message || err) });
+  }).finally(() => {
+    // 无论成功/失败都释放规则，避免残留在浏览器会话里（释放失败仅告警）
+    if (hasPageUrl) {
+      try { releaseRule(url, 'download'); }
+      catch (e) { console.warn('[SW] releaseRule(m3u8) failed:', String(e && e.message || e)); }
+    }
   });
 }
 
 // ---------- MPD 解析处理 ----------
 function handleParseMpd(msg, sendResponse) {
   const url = msg.url;
-  fetch(url, {
+  // P1-3：与 handleParseM3u8 同理——注入页面 Referer 再解析，结束后释放。
+  // 复用既有 DNR 分账（purpose='download'），不改返回结构。
+  const hasPageUrl = !!msg.pageUrl;
+  const rulePromise = hasPageUrl
+    ? setPreviewRefererRule(url, { referer: msg.pageUrl }, 'download')
+    : Promise.resolve(false);
+  rulePromise.catch(() => false).then(() => fetch(url, {
     credentials: 'include',
     headers: { 'Accept': '*/*' }
-  }).then((resp) => {
+  })).then((resp) => {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return resp.text();
   }).then((text) => {
@@ -1632,5 +1763,10 @@ function handleParseMpd(msg, sendResponse) {
     });
   }).catch((err) => {
     sendResponse({ ok: false, error: 'parse_failed', message: String(err && err.message || err) });
+  }).finally(() => {
+    if (hasPageUrl) {
+      try { releaseRule(url, 'download'); }
+      catch (e) { console.warn('[SW] releaseRule(mpd) failed:', String(e && e.message || e)); }
+    }
   });
 }

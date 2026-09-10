@@ -36,9 +36,6 @@ const IMAGE_EXT_RE = /\.(jpe?g|png|gif|bmp|webp|tiff?|avif|apng|heic)(\?|#|$)/i;
 // ---------- 流媒体播放列表（m3u8/mpd/pls） ----------
 const STREAM_EXT_RE = /\.(m3u8|mpd|pls)(\?|#|$)/i;
 
-// ---------- 任意媒体扩展名（供"是否媒体 URL"粗判，含 ico/svg） ----------
-const MEDIA_EXT_RE = /\.(m3u8|mpd|pls|mp4|webm|m4v|avi|mov|mkv|flv|wmv|m4s|ogv|mpg|mpeg|3gp|f4v|asf|rmvb|mts|m2ts|vob|mp3|wav|flac|aac|ogg|m4a|wma|opus|ac3|ape|mka|jpe?g|png|gif|bmp|webp|tiff?|avif|apng|heic|svg|ico)(\?|#|$)/i;
-
 // ---------- 明确非媒体扩展名黑名单（命中即过滤） ----------
 // 注意：不包含 .ts —— .ts 既是视频分片(M2TS)又是 TypeScript 源码，
 //       由 classify() 结合 content-type 单独消歧。
@@ -99,23 +96,6 @@ function isTrackingUrl(url) {
   }
 }
 
-// 粗判：URL 是否带媒体扩展名（含 ico/svg，供"快速跳过非媒体"用）
-function isMediaUrl(url) {
-  try {
-    return MEDIA_EXT_RE.test(new URL(url).pathname);
-  } catch {
-    return false;
-  }
-}
-
-function isStreamUrl(url) {
-  try {
-    return STREAM_EXT_RE.test(new URL(url).pathname);
-  } catch {
-    return false;
-  }
-}
-
 // 明确非媒体的扩展名黑名单（css/html/json/字体/脚本/文档等）
 function isNonMediaUrl(url) {
   try {
@@ -128,11 +108,6 @@ function isNonMediaUrl(url) {
 // 明确非媒体的 content-type
 function isNonMediaMime(mime) {
   return NON_MEDIA_MIME_RE.test(mime || '');
-}
-
-function isMediaMime(mime) {
-  return /^(video\/|audio\/|image\/)/i.test(mime || '') ||
-    /(mpegurl|dash\+xml|vnd\.apple\.mpegurl)/i.test(mime || '');
 }
 
 // 从 URL 提取文件名（无文件名时回退到 URL 本身）
@@ -294,8 +269,6 @@ function setUserRules(rules) {
       : { list: [], white: false }
   };
 }
-
-function getUserRules() { return userRules; }
 
 // 尺寸单位 → 字节（参考猫抓的 B/KB/MB/GB 单位表）
 function sizeToBytes(val, unit) {

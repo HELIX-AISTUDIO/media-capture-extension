@@ -84,6 +84,7 @@ h1 {
 .actions {
   display: flex;
   gap: 5px;
+  flex-wrap: wrap; /* P2-6：新增「录制」按钮后，宽度不足时允许换行，避免按钮溢出破版 */
 }
 
 .actions button {
@@ -559,3 +560,33 @@ footer {
   border-top: 1px solid #e5e7eb;
   line-height: 1.5;
 }
+
+/* ---------- 顶部嗅探总开关（仅追加，不改动任何既有规则） ---------- */
+/* 位于 header 内，水平内边距由 header 提供，此处只留纵向间距，保持紧凑 */
+.switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.4;
+}
+.switcher .switch-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.switcher input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #2563eb;
+}
+.switcher #sniffStateText { font-weight: 600; color: #2563eb; }
+/* 未勾选（=已暂停）时用琥珀色提示，与暂停横幅形成同一语义色 */
+.switcher input[type="checkbox"]:not(:checked) ~ #sniffStateText { color: #b45309; }

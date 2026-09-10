@@ -39,6 +39,10 @@
     "message": "音频",
     "description": "Filter: audio"
   },
+  "popup_filter_stream": {
+    "message": "流媒体",
+    "description": "Filter: stream"
+  },
   "popup_btn_refresh": {
     "message": "刷新",
     "description": "Refresh button"
@@ -176,8 +180,20 @@
     "description": "Unknown size"
   },
   "popup_pause_banner": {
-    "message": "⏸ 抓取已暂停 — 用右键菜单或快捷键「暂停 / 恢复抓取」可恢复",
+    "message": "⏸ 嗅探已暂停：新资源不会被记录（已有列表保留）。用上方开关可随时恢复。",
     "description": "Capture paused banner"
+  },
+  "popup_switch_title": {
+    "message": "暂停 / 恢复嗅探（等同于右键菜单与快捷键）",
+    "description": "Sniffing master switch tooltip"
+  },
+  "popup_switch_on": {
+    "message": "嗅探运行中",
+    "description": "Sniffing master switch on"
+  },
+  "popup_switch_off": {
+    "message": "嗅探已暂停",
+    "description": "Sniffing master switch off"
   },
   "popup_decor_label": {
     "message": "装饰",
@@ -770,5 +786,113 @@
   "options_aria2_saved": {
     "message": "已保存 aria2 配置",
     "description": "aria2 saved"
+  },
+  "popup_btn_record": {
+    "message": "录制",
+    "description": "Record button"
+  },
+  "popup_btn_record_title": {
+    "message": "录制当前标签页画面与声音（保存为 .webm）",
+    "description": "Record button tooltip"
+  },
+  "recorder_title": {
+    "message": "标签页录制",
+    "description": "Recorder page title"
+  },
+  "recorder_heading": {
+    "message": "标签页录制",
+    "description": "Recorder heading"
+  },
+  "recorder_target_label": {
+    "message": "目标标签页：",
+    "description": "Target tab label"
+  },
+  "recorder_tab_loading": {
+    "message": "读取中…",
+    "description": "Tab info loading"
+  },
+  "recorder_tab_unknown": {
+    "message": "（无法读取标签页信息）",
+    "description": "Tab info unknown"
+  },
+  "recorder_tab_untitled": {
+    "message": "（无标题）",
+    "description": "Tab untitled"
+  },
+  "recorder_btn_start": {
+    "message": "开始录制",
+    "description": "Start recording button"
+  },
+  "recorder_btn_stop": {
+    "message": "停止录制",
+    "description": "Stop recording button"
+  },
+  "recorder_status_idle": {
+    "message": "未开始",
+    "description": "Status idle"
+  },
+  "recorder_status_connecting": {
+    "message": "正在获取标签页媒体流…",
+    "description": "Status connecting"
+  },
+  "recorder_status_recording": {
+    "message": "录制中 · 已录 $1 · 已捕获 $2",
+    "description": "Status recording with duration and size"
+  },
+  "recorder_status_saved": {
+    "message": "已保存：$1",
+    "description": "Status saved"
+  },
+  "recorder_tracks_label": {
+    "message": "音视频轨道：",
+    "description": "Media tracks label"
+  },
+  "recorder_hint": {
+    "message": "本功能录制标签页当前画面与声音；受版权保护的加密（DRM）内容会录成黑屏，这是浏览器限制。",
+    "description": "Recorder hint about DRM"
+  },
+  "recorder_limit_hint": {
+    "message": "单次录制最长 60 分钟，或文件达到 2GB 时，会自动停止。",
+    "description": "Recorder limits hint"
+  },
+  "recorder_autostop_time": {
+    "message": "已达 60 分钟上限，自动停止录制。",
+    "description": "Auto-stop by time"
+  },
+  "recorder_autostop_size": {
+    "message": "已达 2GB 上限，自动停止录制。",
+    "description": "Auto-stop by size"
+  },
+  "recorder_err_no_tab": {
+    "message": "未指定目标标签页（缺少 tabId 参数）。",
+    "description": "Error no tab id"
+  },
+  "recorder_err_streamid": {
+    "message": "获取媒体流 ID 失败：$1",
+    "description": "Error getMediaStreamId"
+  },
+  "recorder_err_getusermedia": {
+    "message": "获取标签页媒体流失败：$1。请确认该标签页仍在播放/渲染内容。",
+    "description": "Error getUserMedia"
+  },
+  "recorder_err_recorder": {
+    "message": "创建录制器失败：$1",
+    "description": "Error create MediaRecorder"
+  },
+  "recorder_err_empty": {
+    "message": "未捕获到任何数据，录制失败（可能该标签页无音视频输出）。",
+    "description": "Error empty recording"
+  },
+  "recorder_err_save": {
+    "message": "保存失败：$1",
+    "description": "Error save"
+  },
+  "recorder_err_unknown": {
+    "message": "录制失败：$1",
+    "description": "Error unknown"
+  },
+  "recorder_streamid_guide": {
+    "message": "请先点击扩展图标（或在弹窗里操作一次）后再试；若仍失败，可能是当前页面不支持捕获。",
+    "description": "Guidance when tabCapture streamId cannot be obtained"
   }
 }
