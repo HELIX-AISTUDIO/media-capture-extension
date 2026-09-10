@@ -203,6 +203,24 @@ function deepSearch() {
   if (out.length) reportResources(out);
 }
 
+// ---------- 深度搜索增强：接收 MAIN world 注入脚本发现的媒体 URL（P1-6） ----------
+// 注入脚本（js/injected-search.js，MAIN world）钩住 fetch/XHR，从响应体里发现
+// 「JS 动态拼接的 m3u8」「藏在 JSON 响应里的媒体 URL」等静态扫描抓不到的地址，
+// 经 window.postMessage 传到这里（ISOLATED world），再由本脚本上报后台。
+// 只在深度搜索模式下生效，避免默认模式的列表被噪音污染。
+window.addEventListener('message', (ev) => {
+  try {
+    if (ev.source !== window) return;
+    const d = ev.data;
+    if (!d || d.__mcMediaFound !== true || !Array.isArray(d.urls)) return;
+    if (captureMode !== 'deep') return;
+    const items = d.urls
+      .filter((u) => typeof u === 'string' && isHttpUrl(u))
+      .map((u) => ({ url: u, size: null, source: 'dom', deep: true }));
+    if (items.length > 0) reportResources(items);
+  } catch (e) { /* ignore */ }
+});
+
 // ---------- 初次扫描 ----------
 reportResources(scanMedia().concat(scanImages()).concat(scanPerformance()));
 

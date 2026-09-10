@@ -20,6 +20,13 @@ const src = qs.get('src') || '';
 const ref = qs.get('referer') || '';
 const name = qs.get('name') || 'media';
 const mime = qs.get('mime') || '';
+// 非 forbidden 鉴权头（authorization/x-* 等），由 popup 经 query 传入，供 fetch 直传。
+// referer/cookie/origin 属 forbidden 头，不走这里，由后台 DNR 注入。
+let nonForbiddenHeaders = null;
+try {
+  const nh = qs.get('nh');
+  if (nh) nonForbiddenHeaders = JSON.parse(nh);
+} catch (e) { nonForbiddenHeaders = null; }
 
 const path = (() => { try { return new URL(src).pathname; } catch { return src; } })();
 const isVideo = /^video\//i.test(mime) || /\.(mp4|webm|m4v|mov|mkv|m4s|ogv|3gp|f4v|wmv|flv|ts)$/i.test(path);
@@ -29,8 +36,31 @@ const isImage = /^image\//i.test(mime) || /\.(jpe?g|png|gif|bmp|webp|avif|apng|h
 // Referer 注入状态（下载重试链会用到）
 let refInjected = false;
 
+// 从后台查询到的本资源完整鉴权头（含 cookie/origin），由 init() 异步填充。
+// 未取到时为 null，下载/预览退化为只用 referer（与旧行为一致）。
+let resourceHeaders = null;
+
+// 向后台上报并查询本资源完整鉴权头，避免把 cookie 等敏感头拼进 URL query
+async function fetchResourceHeaders() {
+  try {
+    const r = await chrome.runtime.sendMessage({ action: 'getResourceHeaders', url: src });
+    return (r && r.headers) || null;
+  } catch (e) { return null; }
+}
+
 function safeName(s) {
   return String(s || 'media').replace(/[\\/:*?"<>|~\x00-\x1f]/g, '_').slice(0, 120) || 'media';
+}
+
+// 读取「下载是否弹另存为」偏好（默认 false = 直接下载到默认目录，与后台一致）
+function getSaveAsPref() {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get('downloadSaveAs', (r) => {
+        resolve(!!(r && r.downloadSaveAs === true));
+      });
+    } catch (e) { resolve(false); }
+  });
 }
 
 // 修复历史 BUG：所有 DOM 写入前必须判空。下载进度有按钮时写按钮、
@@ -60,14 +90,17 @@ function clearRefererRule() {
   } catch (e) { /* ignore */ }
 }
 
-// 设置/更新 DNR Referer 规则（referer 为空串表示移除规则）
+// 设置/更新 DNR 鉴权头规则（referer 为空串表示移除规则）
 async function applyRefererRule(referer) {
   try {
     if (!referer) {
       await chrome.runtime.sendMessage({ action: 'clearPreviewReferer' });
       return false;
     }
-    const r = await chrome.runtime.sendMessage({ action: 'previewReferer', url: src, referer });
+    // 把后台查到的完整鉴权头（cookie/origin）与本次尝试的 referer 合并交给 DNR，
+    // 让 referer/cookie/origin 等 forbidden 头都能被注入。
+    const headers = Object.assign({}, resourceHeaders || {}, { referer });
+    const r = await chrome.runtime.sendMessage({ action: 'previewReferer', url: src, headers });
     return !!(r && r.injected);
   } catch (e) { return false; }
 }
@@ -121,7 +154,9 @@ async function fetchMediaWithRetry(onProgress) {
     updateDiag();
     let resp;
     try {
-      resp = await fetch(src, { credentials: 'include' });
+      // 非 forbidden 鉴权头（authorization/x-*）直接由 fetch 携带；
+      // referer/cookie/origin 已由 applyRefererRule 通过 DNR 注入。
+      resp = await fetch(src, { credentials: 'include', headers: nonForbiddenHeaders || undefined });
     } catch (e) {
       lastStatus = -1;
       continue;
@@ -184,7 +219,9 @@ async function downloadViaBlob() {
     const blobType = (/^(video|audio)\//i.test(mime) ? mime : '') || guessMimeFromPath(path);
     const blob = new Blob(chunks, { type: blobType });
     const objUrl = URL.createObjectURL(blob);
-    chrome.downloads.download({ url: objUrl, filename: safeName(name), saveAs: true }, () => {
+    // saveAs 由用户偏好决定（默认 false = 直接下载到默认目录）
+    const saveAs = await getSaveAsPref();
+    chrome.downloads.download({ url: objUrl, filename: safeName(name), saveAs }, () => {
       // blob URL 延迟回收：等待用户在另存对话框确认 / 下载完成
       setTimeout(() => URL.revokeObjectURL(objUrl), 10 * 60 * 1000);
     });
@@ -225,6 +262,10 @@ async function init() {
   diag.id = 'diag';
   diag.style.cssText = 'font-size:12px;color:#9ca3af;';
   if (titleEl && titleEl.insertAdjacentElement) titleEl.insertAdjacentElement('afterend', diag);
+
+  // 先取回本资源完整鉴权头（含 cookie/origin），再注入 DNR 规则并渲染媒体元素，
+  // 避免首次请求因缺 cookie 而 403。取不到时退化为只用 referer（与旧行为一致）。
+  resourceHeaders = await fetchResourceHeaders();
 
   // 先注入 Referer 规则，再渲染媒体元素（避免首次请求 403）
   const autoDl = qs.get('autodl') === '1';

@@ -89,3 +89,46 @@
 - GitHub API 的 `email` 字段默认返回 null，公开邮箱需用户在 GitHub 设置中显式公开；本地 git 身份邮箱建议用 noreply 格式（避免真实邮箱泄露）。
 - 改名后 `git config user.name` 只影响**新 commit**，历史 commit 署名不变（如需改历史用 `git filter-branch`/`rebase`，慎用）。
 
+
+---
+
+## 2026-09-10 · v0.3.0（猫抓优化清单落地：P0 + P1）
+
+对应猫抓模块：过滤规则体系 / 请求头关联 / 存储与生命周期 / 下载回退 / 命令与右键菜单 / MAIN world 深搜
+
+### 1. 过滤规则「数据驱动」：G.OptionLists 四表 → 本项目规则引擎
+- **猫抓**：`init.js` 把 Ext/Type/Regex/blockUrl 四张表放在 `G.OptionLists`，`CheckType`/`CheckExtension`/`operatorCheck`
+  统一校验，`storage.onChanged` 热更新重编译正则。
+- **本项目落地**：`media-parser.js` 新增 `setUserRules/applyUserRules/operatorCheck/wildcardToRegex/isBlockedPageUrl`，
+  存 `storage.sync` 并热更新。**关键差异**：猫抓四表是"唯一真相"（内置值即表内容），本项目采用
+  **「空表 = 无意见 = 完全走内置逻辑」** 语义——保证未配置用户升级零影响，比直接表化更安全。
+- **不照搬**：猫抓用 jQuery 渲染 options 表；本项目纯原生 JS。
+
+### 2. 请求头关联：DIRECT_INCLUDE_HEADERS → 白名单捕获 + 多 id DNR
+- **猫抓**：`background.js` 白名单捕获 referer/cookie/authorization/x-* 等，`function.js setHeaders()` 用 DNR 注入。
+- **本项目落地**：新增 `requestAuthHeaders` Map（含熔断）+ `PERSIST_HEADERS_MAX_CHARS=4000` 体积护栏。
+- **踩坑修正（猫抓方案的隐患，未照抄）**：猫抓用 `parseInt(requestId)` 作 DNR 规则 id，
+  本项目原用固定 `PREVIEW_RULE_ID=1`——两者在并发预览/下载时都会互相覆盖。改为
+  **按资源 URL hash 生成稳定 id（2~30000）+ activeRuleIds 集合管理**。
+
+### 3. 存储与生命周期：猫抓的「接受必死 + 自愈」细化到 MV3
+- 从猫抓 `save()` 的「每 tab 只持久化 99 条」得到启示，落地为 `PERSIST_MAX_PER_TAB=200` + 字段白名单瘦身。
+- 从 `findMedia()` 的 `requestHeaders.size >= 10240` 熔断，落地为 referer / gen / authHeaders 三处 10000 熔断。
+- 从 `SetIcon` 只在 debounce 的 `save()` 里调用，落地为「活跃 tab 缓存 + 100ms 节流」消除 IPC 风暴。
+
+### 4. 下载失败回退：errorList → Blob 通道重试
+- **猫抓**：下载错误码落在 `errorList` 内则改走自带下载器。
+- **本项目落地**：`RETRY_ERROR_CODES` 白名单（只回退 CDN/网络拒绝类，用户取消不回退）+
+  `retriedUrls` 同 URL 只回退一次（防「下载风暴」）+ `active:false` 不抢焦点。
+
+### 5. 命令与右键菜单：runCommands 单函数双入口
+- **猫抓**：`runCommands(command, data)` 同时被 `commands.onCommand` 与 `contextMenus.onClicked` 调用，维护成本减半。
+- **本项目落地**：完全采用该设计。**MV3 差异**：commands 必须写死在 manifest（不能动态注册），
+  且未设默认快捷键（避免冲突），用户需在 `edge://extensions/shortcuts` 自行绑定。
+
+### 6. MAIN world 深搜：search.js 的钩子思路（只取 URL 发现子集）
+- **猫抓**：`catch-script/search.js`（world:MAIN）hook XHR/fetch/JSON.parse/TextDecoder 等，从运行时数据流捞 URL。
+- **本项目落地**：`js/injected-search.js` 只做 **fetch + XHR** 两个钩子，只观察不改写（clone 后读）、
+  文本类 + 体积双重护栏、仅深度模式按需注入（`chrome.scripting` + `world:'MAIN'`，需 Chrome/Edge 111+）。
+- **🔴 明确不迁移**：猫抓 search.js 里的密钥（isKey）转发、MediaSource/MSE 缓冲拦截、WebRTC 等逻辑一律不做
+  （只做 URL 发现，不碰解密/DRM）。

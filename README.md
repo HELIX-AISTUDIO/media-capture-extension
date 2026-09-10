@@ -11,8 +11,12 @@
 
 - **双捕获体系 + 缓存捕捉**：非阻塞 `webRequest` 网络抓包 + DOM 深度搜索 + `performance` 缓存捕捉，减少漏抓。
 - **完整解析体系**：普通资源直列；M3U8 解析器（嵌套多码率 / 分片去重 / 密钥识别）；DASH/MPD 解析器（音视轨分类 / 分片提取）。
-- **弹窗界面**：类型 / 关键词 / 大小区间表达式筛选，排序，批量复制，预览大窗口（视频直接播放）。
-- **抓取模式**：默认模式（过滤头像 / 图标 / svg / ico 等噪音）与深度搜索模式（全量抓取）一键切换。
+- **鉴权头支持**：捕获 Referer / Cookie / Authorization / `x-*` 等鉴权头，弹窗标注「🔒 鉴权」，可「复制为 curl」；下载与预览自动携带。
+- **规则可配置（options 页）**：扩展名 / MIME / 自定义正则 / URL 黑白名单四张表，保存即生效。**全部留空 = 与默认行为完全一致**。
+- **弹窗界面**：类型 / 关键词 / 大小区间表达式筛选，排序，预览大窗口（视频直接播放）。
+- **抓取模式**：默认模式（过滤头像 / 图标 / svg / ico 等噪音）与深度搜索模式（全量抓取 + MAIN world 深搜）一键切换。
+- **下载增强**：失败自动回退 Blob 通道重试；`saveAs` 默认关闭；分片批量下载与 `.m3u8` / URL 列表导出（**不合并**）。
+- **效率工具**：快捷键与右键菜单、按标签页自动下载（串行 + 上限 50 防护）。
 - **SW 生命周期健壮性**：`storage.session` 持久化 + `alarms` 定时唤醒 + `webNavigation` 导航唤醒 + `onConnect` 长连接保活，解决 Service Worker 休眠导致抓取中断。
 - **多 Tab 状态管理**：按 tab 分桶存储，导航刷新自动清理，关闭 tab 自动回收，避免数据残留错乱。
 
@@ -47,10 +51,15 @@
 | --- | --- |
 | `webRequest` | 非阻塞观察网络请求（MV3 下唯一合规的「收集资源列表」路径） |
 | `downloads` | 触发浏览器下载 |
-| `storage` | `chrome.storage.session` 持久化资源列表 |
+| `storage` | `storage.session` 持久化资源列表 + `storage.sync` 存规则 + `storage.local` 存偏好 |
 | `alarms` | 定时唤醒 SW，重新注册监听器 + 回收孤儿数据 |
 | `webNavigation` | 导航事件唤醒 SW + 主框架导航时清理对应 tab 数据 |
+| `declarativeNetRequest` | 会话规则注入 Referer / Cookie 等请求头（预览与下载防盗链） |
+| `contextMenus` | 右键菜单（清空本页 / 切换深度模式 / 暂停抓取 / 下载此图片） |
+| `scripting` | 仅深度搜索模式下注入 MAIN world 脚本（`js/injected-search.js`），用于发现动态拼接的媒体 URL |
 | `host_permissions: <all_urls>` | 让 webRequest 观察到 CDN 等第三方域名媒体 |
+
+> `minimum_chrome_version: 111`（`scripting.executeScript` 的 `world:'MAIN'` 需要 111+）。
 
 ---
 
@@ -63,16 +72,19 @@ edge_media_catch_ext/
 ├── manifest.json                 # 扩展清单（MV3，权限最小化）
 ├── popup.html                    # 弹窗页面
 ├── viewer.html                   # 媒体查看器页面
+├── options.html                  # 规则设置页（四张规则表）
 ├── css/
 │   └── popup.css                 # 弹窗样式
 ├── js/
 │   ├── background.js             # 后台 Service Worker：非阻塞 webRequest + storage 持久化 + 消息路由
-│   ├── media-parser.js           # 媒体正则库 + 分类 + 去重 + 安全文件名
+│   ├── media-parser.js           # 媒体正则库 + 分类 + 去重 + 安全文件名 + 用户规则引擎
 │   ├── m3u8-parser.js            # M3U8 解析器
 │   ├── mpd-parser.js             # DASH/MPD 解析器
-│   ├── content.js                # 内容脚本：DOM 扫描 + 深度搜索 + 缓存捕捉
-│   ├── popup.js                  # 弹窗逻辑：筛选/排序/预览/解析/批量复制
-│   ├── viewer.js                 # 查看器逻辑：Referer 注入 + 内嵌播放 + Blob 下载通道
+│   ├── content.js                # 内容脚本：DOM 扫描 + 深度搜索 + 缓存捕捉 + MAIN world 桥接
+│   ├── injected-search.js        # 深度模式注入脚本（MAIN world）：钩 fetch/XHR 发现媒体 URL
+│   ├── popup.js                  # 弹窗逻辑：筛选/排序/预览/解析/导出/批量下载
+│   ├── options.js                # 规则设置页逻辑
+│   ├── viewer.js                 # 查看器逻辑：鉴权头注入 + 内嵌播放 + Blob 下载通道
 │   └── utils/
 │       └── generate_icons.py     # 图标生成脚本（纯 Python 标准库）
 ├── img/                          # 扩展图标 icon16/48/128.png

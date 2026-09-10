@@ -268,6 +268,149 @@ function isJunkImage(url, size) {
 }
 
 /**
+ * ============================================================
+ * 用户可配置规则体系（v0.2.6 新增）
+ * ------------------------------------------------------------
+ * 四张表：Ext（扩展名）/ Type（MIME）/ Regex（自定义正则）/ blockUrl（URL 黑白名单）
+ *
+ * 🔴 关键设计原则：**不配置 = 与历史行为完全一致**。
+ *   用户规则表默认为空；空表时本引擎返回 'unknown'（不发表意见），
+ *   调用方继续走下方原有的硬编码闸门。只有用户显式添加规则后才生效。
+ *   这样保证「升级后未配置的用户行为零变化」——不会误伤、不会误删。
+ * ============================================================
+ */
+
+// 当前生效的用户规则（由 background.js 从 storage.sync 加载后 setUserRules 注入）
+let userRules = { Ext: [], Type: [], Regex: [], blockUrl: { list: [], white: false } };
+
+function setUserRules(rules) {
+  if (!rules || typeof rules !== 'object') return;
+  userRules = {
+    Ext: Array.isArray(rules.Ext) ? rules.Ext : [],
+    Type: Array.isArray(rules.Type) ? rules.Type : [],
+    Regex: Array.isArray(rules.Regex) ? rules.Regex : [],
+    blockUrl: (rules.blockUrl && typeof rules.blockUrl === 'object')
+      ? { list: Array.isArray(rules.blockUrl.list) ? rules.blockUrl.list : [], white: !!rules.blockUrl.white }
+      : { list: [], white: false }
+  };
+}
+
+function getUserRules() { return userRules; }
+
+// 尺寸单位 → 字节（参考猫抓的 B/KB/MB/GB 单位表）
+function sizeToBytes(val, unit) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return null;
+  const u = String(unit || 'B').toUpperCase();
+  const mult = { B: 1, KB: 1024, MB: 1024 * 1024, GB: 1024 * 1024 * 1024 }[u] || 1;
+  return n * mult;
+}
+
+/**
+ * 尺寸比较（参考猫抓 operatorCheck）。
+ * 支持：>= <= > < = != ~（区间，size 写作 "500-1000"）
+ */
+function operatorCheck(size, rule) {
+  if (size == null || !rule) return false;
+  const op = rule.operator || '>=';
+  if (op === '~') {
+    const m = /^\s*([\d.]+)\s*-\s*([\d.]+)\s*$/.exec(String(rule.size));
+    if (!m) return false;
+    const lo = sizeToBytes(m[1], rule.unit);
+    const hi = sizeToBytes(m[2], rule.unit);
+    return lo != null && hi != null && size >= lo && size <= hi;
+  }
+  const target = sizeToBytes(rule.size, rule.unit);
+  if (target == null) return false;
+  switch (op) {
+    case '>=': return size >= target;
+    case '<=': return size <= target;
+    case '>': return size > target;
+    case '<': return size < target;
+    case '=': return size === target;
+    case '!=': return size !== target;
+    default: return false;
+  }
+}
+
+// 通配符 → 正则（* → .*，? → .，其余字符转义）——参考猫抓 wildcardToRegex
+function wildcardToRegex(pat) {
+  return new RegExp('^' + String(pat)
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.') + '$', 'i');
+}
+
+/**
+ * URL 黑/白名单判定（基于「发起请求的页面 URL」）。
+ * @param {string} pageUrl 发起请求的页面 URL（webRequest details.initiator 或 tab URL）
+ * @returns {boolean} true=应当屏蔽本页的所有抓取
+ */
+function isBlockedPageUrl(pageUrl) {
+  const bl = userRules.blockUrl;
+  if (!pageUrl || !bl || !Array.isArray(bl.list) || bl.list.length === 0) return false;
+  let hit = false;
+  for (const pat of bl.list) {
+    if (!pat) continue;
+    try {
+      if (wildcardToRegex(pat).test(pageUrl)) { hit = true; break; }
+    } catch (e) { /* 用户写坏的通配符跳过，避免一条坏规则搞崩全部 */ }
+  }
+  // white=false：命中即屏蔽（黑名单）；white=true：命中才放行（未命中即屏蔽）
+  return bl.white ? !hit : hit;
+}
+
+/**
+ * 应用用户 Ext/Type/Regex 规则，返回过滤「意见」。
+ * @returns {{verdict:'keep'|'drop'|'unknown', url:string}}
+ *   verdict='unknown' → 用户规则表对该资源无意见，调用方继续走默认闸门。
+ *   url 可能被 Regex 规则改写（replaceTo 捕获组拼接）。
+ */
+function applyUserRules(url, mime, size) {
+  let outUrl = String(url || '');
+  // 1) Regex：命中可黑标丢弃 / 改写 URL（只对路径部分匹配，避免查询串误伤）
+  for (const r of userRules.Regex) {
+    if (!r || r.state === false || !r.regex) continue;
+    let re;
+    try {
+      re = new RegExp(r.regex, r.type || '');
+    } catch (e) { continue; } // 正则非法 → 跳过（不能让一条坏规则搞崩全部）
+    if (!re.test(outUrl)) continue;
+    if (r.blackList) return { verdict: 'drop', url: outUrl };
+    if (r.replaceTo) {
+      try { outUrl = outUrl.replace(re, r.replaceTo); } catch (e) { /* 忽略改写失败 */ }
+    }
+  }
+  // 2) Ext：按扩展名覆盖尺寸闸门（size 未知时不判决，交给默认闸门）
+  const lower = outUrl.toLowerCase();
+  for (const r of userRules.Ext) {
+    if (!r || !r.ext || r.state === false) continue;
+    const ext = String(r.ext).replace(/^\./, '').toLowerCase();
+    if (!ext) continue;
+    let hit = false;
+    try { hit = new RegExp('\\.' + ext.replace(/[.+^${}()|[\]\\]/g, '\\$&') + '(\\?|#|$)', 'i').test(lower); } catch (e) { continue; }
+    if (!hit) continue;
+    if (size != null && !operatorCheck(size, r)) return { verdict: 'drop', url: outUrl };
+    return { verdict: 'keep', url: outUrl };
+  }
+  // 3) Type：按 MIME 通配覆盖尺寸闸门（如 video/*）
+  if (mime) {
+    for (const r of userRules.Type) {
+      if (!r || !r.type || r.state === false) continue;
+      const mt = String(r.type).toLowerCase();
+      let re;
+      try {
+        re = new RegExp('^' + mt.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'i');
+      } catch (e) { continue; }
+      if (!re.test(mime)) continue;
+      if (size != null && !operatorCheck(size, r)) return { verdict: 'drop', url: outUrl };
+      return { verdict: 'keep', url: outUrl };
+    }
+  }
+  return { verdict: 'unknown', url: outUrl };
+}
+
+/**
  * 默认模式统一过滤闸门（白名单优先 + 黑名单补刀 + content-type + 尺寸）。
  * @param {string} type  classify() 结果
  * @param {string} url   资源 URL
@@ -276,9 +419,18 @@ function isJunkImage(url, size) {
  * @param {string} mode  'default' | 'deep'
  * @returns {boolean} true=保留，false=过滤
  */
-function shouldKeepResource(type, url, mime, size, mode) {
+function shouldKeepResource(type, url, mime, size, mode, skipUserRules) {
   // 深度搜索模式：不过滤（追踪接口在调用方单独过滤）
   if (mode === 'deep') return true;
+  // 0) 用户规则优先（空表时返回 'unknown'，等价于不配置 → 完全走下面的历史逻辑）
+  //    skipUserRules=true：调用方（background 捕获点）已自行应用过用户规则，
+  //    这里跳过以避免 URL 被 Regex 规则重复改写（改写不幂等）。
+  if (!skipUserRules) {
+    const u = applyUserRules(url, mime, size);
+    if (u.verdict === 'drop') return false;
+    // 用户显式命中的规则为「保留」→ 直接放行（覆盖下方默认白名单/黑名单闸门）
+    if (u.verdict === 'keep') return true;
+  }
   // 1) 白名单：类型必须明确为 视频/音频/图片/流媒体，未知类型默认丢弃
   if (type !== 'video' && type !== 'audio' && type !== 'image' && type !== 'stream') return false;
   // 2) 黑名单：明确非媒体扩展名（css/html/json/字体/脚本/文档）

@@ -98,6 +98,23 @@ h1 {
 }
 
 .actions button:hover { background: #f3f4f6; }
+.actions button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+.actions button.active:hover { background: #1d4ed8; }
+
+#pauseBanner {
+  margin: 8px 0;
+  padding: 7px 10px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 7px;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 .searchbar {
   display: flex;
@@ -253,6 +270,7 @@ main {
 .tag-unknown { background: #6b7280; }
 .tag-stream { background: #7c3aed; }
 .tag-decor { background: #9ca3af; }
+.tag-auth { background: #1d4ed8; }
 
 .source {
   flex-shrink: 0;
@@ -513,6 +531,16 @@ main {
 .parse-seg .idx { color: #9ca3af; width: 30px; flex-shrink: 0; }
 .parse-seg .seg-url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4b5563; }
 .parse-seg .seg-copy { cursor: pointer; color: #2563eb; flex-shrink: 0; }
+
+/* 分片操作条：导出 / 批量下载（不合并） */
+.parse-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.parse-actions .btn { font-size: 12px; padding: 5px 10px; }
+.parse-hint { margin-top: 6px; font-size: 11px; color: #9ca3af; }
 
 /* ---------- 底部 ---------- */
 footer {

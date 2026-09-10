@@ -22,6 +22,20 @@ let allResources = [];
 let currentFilter = 'video';
 let currentSort = 'desc';
 
+// 抓取暂停提示：抓取开关由快捷键 / 右键菜单切换，popup 必须明确提示，
+// 否则用户会以为扩展坏了（抓不到任何资源却不知道是自己暂停了）。
+let captureEnabledState = true;
+function updatePauseBanner() {
+  const existing = document.getElementById('pauseBanner');
+  if (captureEnabledState) { if (existing) existing.remove(); return; }
+  if (existing) return;
+  const el = document.createElement('div');
+  el.id = 'pauseBanner';
+  el.textContent = '⏸ 抓取已暂停 — 用右键菜单或快捷键「暂停 / 恢复抓取」可恢复';
+  const list = document.getElementById('list');
+  if (list && list.parentNode) list.parentNode.insertBefore(el, list);
+}
+
 const TYPE_META = {
   video: { label: '视频', cls: 'tag-video' },
   image: { label: '图片', cls: 'tag-image' },
@@ -174,6 +188,22 @@ function filteredAndSorted() {
 // ---------- 媒体查看器（全屏页面） ----------
 // 视频/音频的「打开」不再跳原始地址（防盗链 CDN 会 403），改为打开
 // 扩展查看器页面，自动注入原始 Referer 后内嵌播放（参考图片的打开体验）
+
+// 从资源 requestHeaders 里提取「非 forbidden」头（authorization/x-* 等）。
+// referer/cookie/origin 属浏览器 forbidden 头，fetch 不能显式设置，只能走后台 DNR 注入，
+// 因此这里只提取能被 fetch 直接携带的头，经 query 传给 viewer。
+function nonForbiddenHeaders(r) {
+  const src = r && r.requestHeaders;
+  if (!src || typeof src !== 'object') return null;
+  const out = {};
+  for (const k of Object.keys(src)) {
+    const kl = k.toLowerCase();
+    if (kl === 'referer' || kl === 'cookie' || kl === 'origin') continue;
+    out[k] = src[k];
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 function openViewer(r, autoDownload) {
   const q = new URLSearchParams({
     src: r.url,
@@ -182,6 +212,18 @@ function openViewer(r, autoDownload) {
     mime: r.mime || ''
   });
   if (autoDownload) q.set('autodl', '1');
+  // 传递非 forbidden 鉴权头（authorization/x-*）给 viewer 的 fetch 直传。
+  // 只带 JSON 短小的（避免 URL 超长）；超长时只带 authorization（最关键的鉴权头）。
+  const nh = nonForbiddenHeaders(r);
+  if (nh) {
+    let payload = nh;
+    try {
+      if (JSON.stringify(nh).length > 2000) {
+        payload = nh.authorization ? { authorization: nh.authorization } : null;
+      }
+    } catch (e) { payload = null; }
+    if (payload) q.set('nh', JSON.stringify(payload));
+  }
   chrome.tabs.create({ url: chrome.runtime.getURL('viewer.html') + '?' + q.toString() });
 }
 
@@ -215,6 +257,10 @@ function render() {
     const decorTag = isDecorativeImage(r)
       ? '<span class="tag tag-decor" title="装饰/头像/logo 小图：默认模式已自动过滤，仅深度搜索模式显示">装饰</span>'
       : '';
+    // 鉴权头标记：该资源带 Cookie/Authorization 等头，下载/预览将自动携带
+    const authTag = (r.requestHeaders && Object.keys(r.requestHeaders).length > 0)
+      ? '<span class="tag tag-auth" title="该资源需要鉴权头（如 Cookie/Authorization），下载/预览将自动携带">🔒 鉴权</span>'
+      : '';
     const filename = r.filename || (() => {
       try {
         const last = new URL(r.url).pathname.split('/').filter(Boolean).pop();
@@ -231,6 +277,7 @@ function render() {
             <span class="tag ${baseMeta.cls}">${baseMeta.label}</span>
             <span class="source ${sMeta.cls}" title="来源：${sMeta.label === 'DOM' ? '页面元素/缓存' : '网络请求'}">${sMeta.label}</span>
             ${decorTag}
+            ${authTag}
             <span class="name" title="${escapeHtml(r.url)}">${escapeHtml(filename)}</span>
             ${dim ? `<span class="dim">${dim}</span>` : ''}
             <span class="size">${formatSize(r.size)}</span>
@@ -274,7 +321,7 @@ function render() {
         openViewer(r2, true);
         return;
       }
-      downloadUrl(btn, btn.dataset.url, btn.dataset.name, (r2 && r2.referer) || currentTabUrl || '');
+      downloadUrl(btn, btn.dataset.url, btn.dataset.name, (r2 && r2.referer) || currentTabUrl || '', (r2 && r2.requestHeaders) || undefined, (r2 && r2.mime) || '');
     });
   });
   // 打开按钮：视频/音频 → 媒体查看器；其它 → 新标签页原始地址
@@ -309,10 +356,11 @@ function render() {
 
 // ---------- 下载（带失败兜底） ----------
 // referer 传给后台：防盗链 CDN 的下载请求需注入 Referer，否则 403 被存成 .htm
-function downloadUrl(btn, url, filename, referer) {
+// headers 是资源完整鉴权头对象（可为空），供后台 DNR 一并注入 cookie/origin。
+function downloadUrl(btn, url, filename, referer, headers, mime) {
   btn.disabled = true;
   btn.textContent = '下载中…';
-  chrome.runtime.sendMessage({ action: 'download', url, filename, referer }, (resp) => {
+  chrome.runtime.sendMessage({ action: 'download', url, filename, referer, headers, mime }, (resp) => {
     btn.disabled = false;
     if (resp && resp.ok) {
       btn.textContent = '已发起';
@@ -379,6 +427,23 @@ function buildPreviewMedia(r) {
   return `<div class="preview-media unknown">无法预览该媒体类型</div>`;
 }
 
+// 生成 curl 下载命令：只为实际存在的鉴权头生成 -H；值写入剪贴板由用户自行使用。
+// 注意：curl 输出的是明文凭据，用户粘贴到自己终端即视为知情。
+function buildCurlCommand(r) {
+  const nm = safeFileName(r.filename || 'resource');
+  const parts = ['curl', '-o', '"' + nm + '"'];
+  const h = r.requestHeaders;
+  if (h && typeof h === 'object') {
+    for (const k of Object.keys(h)) {
+      // 简单转义：值里的双引号/反斜杠会影响 shell，做最小转义
+      const v = String(h[k]).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      parts.push('-H', '"' + k + ': ' + v + '"');
+    }
+  }
+  parts.push('"' + r.url + '"');
+  return parts.join(' ');
+}
+
 async function showPreview(r, autoParse) {
   // 先注入 Referer 会话规则，再渲染播放器——避免 <video> 请求先于规则发出
   // 导致防盗链 CDN 首次请求就 403（注入的 Referer 用抓取时记录的原始值）
@@ -386,7 +451,13 @@ async function showPreview(r, autoParse) {
     const ref = r.referer || currentTabUrl || '';
     try {
       if (ref) {
-        await chrome.runtime.sendMessage({ action: 'previewReferer', url: r.url, referer: ref });
+        // 传完整白名单对象（含 cookie/origin），让后台 DNR 注入全部 forbidden 头
+        await chrome.runtime.sendMessage({
+          action: 'previewReferer',
+          url: r.url,
+          referer: ref,
+          headers: r.requestHeaders || { referer: ref }
+        });
       }
     } catch (e) { /* ignore */ }
   }
@@ -414,6 +485,11 @@ async function showPreview(r, autoParse) {
     metaParts.push('<span class="preview-warn">⚠ 流媒体：需解析分片后合并</span>');
   }
   metaParts.push(TYPE_META[r.type] ? TYPE_META[r.type].label : '未知');
+  if (r.requestHeaders && Object.keys(r.requestHeaders).length > 0) {
+    // 只显示鉴权头「名称」，不显示值（避免明文凭据铺在界面上）
+    const hnames = Object.keys(r.requestHeaders).map((k) => k.charAt(0).toUpperCase() + k.slice(1)).join(', ');
+    metaParts.push('🔒 鉴权头: ' + escapeHtml(hnames));
+  }
   if (r.mime) metaParts.push(escapeHtml(r.mime));
   metaParts.push(formatSize(r.size));
   if (r.width && r.height) metaParts.push(`${r.width}×${r.height}`);
@@ -422,6 +498,10 @@ async function showPreview(r, autoParse) {
 
   const isStream = r.type === 'stream';
   const parseBtn = isStream ? `<button class="btn btn-parse" id="previewParse" data-url="${escapeHtml(r.url)}">解析分片</button>` : '';
+  // 「复制为 curl」按钮：仅当资源带鉴权头时才显示（否则 curl 与「复制链接」无差别）
+  const curlBtn = (r.requestHeaders && Object.keys(r.requestHeaders).length > 0)
+    ? `<button class="btn btn-curl" data-url="${escapeHtml(r.url)}" title="生成带鉴权头的 curl 命令">复制为curl</button>`
+    : '';
 
   overlay.innerHTML = `
     <div class="preview-card">
@@ -437,6 +517,7 @@ async function showPreview(r, autoParse) {
           <button class="btn btn-copy" data-url="${escapeHtml(r.url)}">复制链接</button>
           <button class="btn btn-download" data-url="${escapeHtml(r.url)}" data-name="${escapeHtml(safeFileName(filename))}">下载</button>
           <button class="btn btn-open" data-url="${escapeHtml(r.url)}">打开</button>
+          ${curlBtn}
           ${parseBtn}
         </div>
       </div>
@@ -481,12 +562,22 @@ async function showPreview(r, autoParse) {
       closePreview();
       return;
     }
-    downloadUrl(e.target, r.url, safeFileName(filename), r.referer || currentTabUrl || '');
+    downloadUrl(e.target, r.url, safeFileName(filename), r.referer || currentTabUrl || '', r.requestHeaders || undefined, r.mime || '');
   });
   overlay.querySelector('.btn-open').addEventListener('click', () => {
     if (r.type === 'video' || r.type === 'audio') openViewer(r);
     else chrome.tabs.create({ url: r.url });
   });
+  // 「复制为 curl」按钮绑定（仅当按钮存在，即资源带鉴权头时）
+  const curlBtnEl = overlay.querySelector('.btn-curl');
+  if (curlBtnEl) {
+    curlBtnEl.addEventListener('click', () => {
+      navigator.clipboard.writeText(buildCurlCommand(r)).then(() => {
+        curlBtnEl.textContent = '已复制';
+        setTimeout(() => (curlBtnEl.textContent = '复制为curl'), 1200);
+      });
+    });
+  }
   const parseBtnEl = overlay.querySelector('#previewParse');
   if (parseBtnEl) {
     parseBtnEl.addEventListener('click', () => doParse(r));
@@ -513,7 +604,53 @@ function doParse(r) {
   });
 }
 
+// ---------- 分片导出 / 批量下载（不合并，红线内） ----------
+// 只做「批量下载分片」与「导出播放列表」，绝不合并（在线 ffmpeg.wasm 已永久否决）。
+// 合并交给本地工具（ffmpeg / N_m3u8DL-CLI / aria2），避免在扩展里拼大文件。
+function buildM3u8Text(segments) {
+  const lines = ['#EXTM3U', '#EXT-X-VERSION:3'];
+  const maxDur = Math.max(1, Math.ceil(segments.reduce((m, s) => Math.max(m, s.duration || 0), 0)));
+  lines.push('#EXT-X-TARGETDURATION:' + maxDur);
+  lines.push('#EXT-X-MEDIA-SEQUENCE:0');
+  for (const s of segments) {
+    lines.push('#EXTINF:' + (s.duration || 0).toFixed(3) + ',');
+    lines.push(s.url);
+  }
+  lines.push('#EXT-X-ENDLIST');
+  return lines.join('\n');
+}
+
+function saveTextAsFile(text, filename, mime) {
+  try {
+    const blob = new Blob([text], { type: mime || 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({ url, filename: safeFileName(filename), saveAs: false }, () => {
+      void chrome.runtime.lastError; // popup 关闭时会有 lastError，属正常
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+  } catch (e) { /* ignore */ }
+}
+
+function downloadAllSegments(btn, segments, baseName) {
+  if (!segments || segments.length === 0) return;
+  const urls = segments.map((s) => s.url).filter(Boolean);
+  if (urls.length === 0) return;
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = '已入队 ' + urls.length + ' 个…';
+  chrome.runtime.sendMessage({ action: 'downloadSegments', urls, baseName }, () => {
+    setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 1600);
+  });
+}
+
 function renderParseResult(el, parsed, isMpd) {
+  const allSegs = parsed.segments || [];
+  // 导出文件名前缀：优先用当前预览资源名
+  const baseName = (() => {
+    const f = (previewResource && previewResource.filename) || 'segments';
+    return String(f).replace(/\.[^.]*$/, '').replace(/[\\/:*?"<>|]/g, '_') || 'segments';
+  })();
+
   if (isMpd) {
     const reps = parsed.representations || [];
     const segs = parsed.segments || [];
@@ -552,6 +689,40 @@ function renderParseResult(el, parsed, isMpd) {
     if (segs.length === 0 && playlists.length === 0) html = '<div class="parse-head">未解析到分片，可能是嵌套 m3u8 或加密流。</div>';
     el.innerHTML = html;
   }
+
+  // 操作条：导出 / 批量下载（仅当确有分片时显示；明确不做合并）
+  if (allSegs.length > 0) {
+    const isM3u8 = !isMpd;
+    const bar = document.createElement('div');
+    bar.className = 'parse-actions';
+    if (isM3u8) {
+      const bM3u8 = document.createElement('button');
+      bM3u8.className = 'btn';
+      bM3u8.textContent = '导出为 .m3u8';
+      bM3u8.addEventListener('click', () => {
+        saveTextAsFile(buildM3u8Text(allSegs), baseName + '.m3u8', 'application/vnd.apple.mpegurl');
+      });
+      bar.appendChild(bM3u8);
+    }
+    const bTxt = document.createElement('button');
+    bTxt.className = 'btn';
+    bTxt.textContent = '导出 URL 列表';
+    bTxt.addEventListener('click', () => {
+      saveTextAsFile(allSegs.map((s) => s.url).join('\n'), baseName + '_urls.txt', 'text/plain');
+    });
+    const bDl = document.createElement('button');
+    bDl.className = 'btn';
+    bDl.textContent = '下载全部分片（' + allSegs.length + '）';
+    bDl.addEventListener('click', () => downloadAllSegments(bDl, allSegs, baseName));
+    bar.appendChild(bTxt);
+    bar.appendChild(bDl);
+    const hint = document.createElement('div');
+    hint.className = 'parse-hint';
+    hint.textContent = '仅下载 / 导出分片，不做合并；合并请用本地 ffmpeg / N_m3u8DL。';
+    el.appendChild(bar);
+    el.appendChild(hint);
+  }
+
   // 绑定分片复制
   el.querySelectorAll('.seg-copy').forEach((span) => {
     span.addEventListener('click', () => {
@@ -570,6 +741,17 @@ function refresh() {
       if (!tabs[0]) { resolve(); return; }
       currentTabId = tabs[0].id;
       currentTabUrl = tabs[0].url || '';
+      // 读取抓取开关状态（快捷键/右键菜单可切换）
+      try {
+        chrome.runtime.sendMessage({ action: 'getCaptureState' }, (st) => {
+          if (chrome.runtime.lastError) return;
+          if (st) {
+            captureEnabledState = st.enabled !== false;
+            updatePauseBanner();
+          }
+        });
+      } catch (e) { /* ignore */ }
+      loadAutoDown();   // 同步自动下载开关的按钮态
       chrome.runtime.sendMessage({ action: 'getResources', tabId: currentTabId }, (resp) => {
         if (chrome.runtime.lastError) {
           allResources = [];
@@ -662,6 +844,41 @@ document.getElementById('clear').addEventListener('click', () => {
   closePreview();
   chrome.runtime.sendMessage({ action: 'clearResources', tabId: currentTabId }, () => refresh());
 });
+// 设置按钮：打开规则设置页（options.html，扩展名/MIME/正则/黑白名单四表）
+document.getElementById('settings').addEventListener('click', () => {
+  try { chrome.runtime.openOptionsPage(); } catch (e) { /* ignore */ }
+});
+
+// ---------- 自动下载开关（P1-4，按 tab 绑定） ----------
+// 只对新抓到的资源生效（不会把列表里已有的几百条一次性下载下来），
+// 后台另有「串行 + 单 tab 上限 50」两道护栏。
+let autoDownOn = false;
+function applyAutoDownUI() {
+  const btn = document.getElementById('autoDown');
+  if (!btn) return;
+  btn.textContent = autoDownOn ? '自动下载·开' : '自动下载';
+  if (autoDownOn) btn.classList.add('active'); else btn.classList.remove('active');
+  btn.title = autoDownOn
+    ? '自动下载已开启：本页新抓到的资源会自动下载（点击关闭）'
+    : '开启后，本页新抓到的资源将自动下载（串行 + 单标签页上限 50）';
+}
+function loadAutoDown() {
+  if (currentTabId == null) return;
+  chrome.runtime.sendMessage({ action: 'getAutoDown', tabId: currentTabId }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    if (resp) { autoDownOn = !!resp.on; applyAutoDownUI(); }
+  });
+}
+document.getElementById('autoDown').addEventListener('click', () => {
+  if (currentTabId == null) return;
+  const next = !autoDownOn;
+  chrome.runtime.sendMessage({ action: 'setAutoDown', tabId: currentTabId, on: next }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    autoDownOn = !!(resp && resp.on);
+    applyAutoDownUI();
+  });
+});
+
 // 批量复制按钮已移除（v0.2.4 精简界面，仅保留刷新/清空）
 
 document.addEventListener('keydown', (e) => {
