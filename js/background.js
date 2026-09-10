@@ -320,7 +320,11 @@ function applyFileNameTemplate(tpl, info) {
   if (ext && last.lastIndexOf('.') <= 0) {
     parts[parts.length - 1] = last + '.' + ext;
   }
-  return parts.join('/');
+  // 总长护栏：多段拼接可能超过 Windows MAX_PATH(260)，超限时逐级丢弃靠前的目录段，
+  // 保留最贴近文件名的部分（单段已被 safeFilename 限长，最终必定 ≤240）。
+  while (parts.length > 1 && parts.join('/').length > 240) parts.shift();
+  const joined = parts.join('/');
+  return joined.length > 240 ? (parts[parts.length - 1] || null) : joined;
 }
 
 // ---------- 抓取开关（暂停/恢复） ----------
@@ -566,10 +570,19 @@ function getContentType(headers) {
 // 导致先打开的预览规则被后一个资源冲掉 → 防盗链 CDN 又 403。
 // 改为按 URL hash 生成稳定 id（同一资源复用同一 id，不同资源互不干扰）。
 const DNR_RULE_ID_MIN = 2;
-const DNR_RULE_ID_MAX = 30000;
+// 规则 id 空间：DNR 只要求 id 是「非零整数」，对数值上限没有约束，因此给足空间。
+// 原值 30000 太小：50 个并发资源时实测碰撞率约 3.9%，而碰撞会让后写入的
+// addRules 直接覆盖前一条同 id 规则 → 先打开的资源注入失效（CDN 403）。
+// 扩大到 1e9 后碰撞率降到约 1e-6（ruleIdForUrl 的取模表达式不变）。
+const DNR_RULE_ID_MAX = 1000000000;
 
-// 当前活跃的 DNR 规则 id 集合（并发预览/下载各自独立，清理时统一移除）
+// 当前活跃的 DNR 规则 id 集合（真实存在于浏览器侧的规则，属于「总集」）
 const activeRuleIds = new Set();
+// 按用途分账：预览用 / 下载用。同一 id 可能被两边同时持有（同一 URL 既在预览又在下载），
+// 只有「两个用途都不再持有」才能真删，否则会出现「一个无关下载完成 → 正在预览的规则被清掉」，
+// 即 v0.3.0 已修好的防盗链预览 403 问题被重新带回来。
+const previewRuleIds = new Set();
+const downloadRuleIds = new Set();
 
 // 按资源 URL 生成稳定规则 id（简单字符串 hash，映射到 [2, 30000]）
 function ruleIdForUrl(url) {
@@ -596,9 +609,14 @@ function rootDomainOf(host) {
   return parts.slice(-2).join('.');
 }
 
-function setPreviewRefererRule(url, headers) {
+function setPreviewRefererRule(url, headers, purpose) {
   // headers 可为 {referer, cookie, origin, ...} 对象；也兼容旧的字符串 referer 调用
   const h = (typeof headers === 'string') ? { referer: headers } : (headers || {});
+  // 用途分账：'preview'（默认，popup/viewer 的预览）| 'download'（下载类注入）。
+  // 为什么必须区分：预览与下载经常并存，清理时必须各清各的账。
+  // 否则「用户随便完成一个下载」就会把正在进行的预览规则一起清掉 → CDN 403（BUG-1）。
+  const use = (purpose === 'download') ? 'download' : 'preview';
+  const ownSet = (use === 'download') ? downloadRuleIds : previewRuleIds;
   // 返回 Promise<boolean>：规则是否成功写入（供查看器显示注入状态）
   return new Promise((resolve) => {
     try {
@@ -611,6 +629,13 @@ function setPreviewRefererRule(url, headers) {
       // （如 upos-sz-estghw → upos-sz-mirror-coldetc），精确域名会导致
       // 重定向后的请求不受规则保护而 403。注入的 Referer 值就是原页面
       // 自己发请求时用的 Referer，因此对页面正常播放无副作用。
+      // ⚠️ 已知限制：同一主域下若有多个资源各自建规则、且注入的 Referer 不同，
+      // DNR 面对「同域 + 同优先级 + 同为 modifyHeaders」的多条规则时选择是不确定的
+      // （最终哪条生效不保证）。同一页面内资源的 Referer 通常相同，故实际影响有限。
+      // 请勿为规避它把 requestDomains 改成精确子域——主域正是为了覆盖上述 CDN 重定向。
+      // 另一个已知取舍：若预览页被强制关闭（未触发 unload），其规则会保留到浏览器会话结束。
+      // 这是有意为之——不做基于时间的清扫，否则会误清长视频预览中途的规则导致突然 403；
+      // 该残留只是继续注入「页面自己的 Referer」（与页面正常播放同值），且随会话结束消失。
       const root = rootDomainOf(host);
       // 只注入 forbidden 头（referer/cookie/origin）；authorization/x-* 等
       // 非 forbidden 头由 viewer 的 fetch 直接携带，不必走 DNR（fetch 可设）。
@@ -620,6 +645,12 @@ function setPreviewRefererRule(url, headers) {
       }
       if (requestHeaders.length === 0) { resolve(false); return; }
       const ruleId = ruleIdForUrl(url);
+      // 先登记进总集：异步写入期间若有清理动作，能正确看到「有在途规则」
+      // 记录本次调用前「本用途是否已持有该 id」——失败回滚必须幂等：
+      // 若此前已持有（说明上一次写入成功、浏览器侧规则仍在），本次失败不能删它的持有记录，
+      // 否则会留下「浏览器里有规则、我们不再追踪」的幽灵规则（谁都清不掉，残留到会话结束）。
+      // 可达场景：对同一资源重复点预览/下载、viewer 重载同一 URL，第二次写入瞬时失败。
+      const alreadyOwned = ownSet.has(ruleId);
       activeRuleIds.add(ruleId);
       chrome.declarativeNetRequest.updateSessionRules({
         removeRuleIds: [ruleId],
@@ -637,10 +668,18 @@ function setPreviewRefererRule(url, headers) {
         }]
       }, () => {
         if (chrome.runtime.lastError) {
-          activeRuleIds.delete(ruleId);
+          // 失败回滚必须「幂等」：只回滚本次新增的持有记录。
+          // 此前已持有（alreadyOwned）说明上一次写入成功、浏览器侧规则仍在，
+          // 此时若照删，就会造成「浏览器有规则但无人追踪」的幽灵规则。
+          // 跨用途同理：另一方仍持有同一 id 时也不能从总集删除。
+          if (!alreadyOwned) {
+            ownSet.delete(ruleId);
+            if (!previewRuleIds.has(ruleId) && !downloadRuleIds.has(ruleId)) activeRuleIds.delete(ruleId);
+          }
           console.warn('[SW] previewReferer rule failed:', chrome.runtime.lastError.message);
           resolve(false);
         } else {
+          ownSet.add(ruleId);
           resolve(true);
         }
       });
@@ -651,14 +690,45 @@ function setPreviewRefererRule(url, headers) {
   });
 }
 
-function clearPreviewRefererRule() {
+// 按用途释放规则：另一方仍在持有同一个 id 时不能删，否则会打断对方的注入。
+// own 清空是「本用途不再持有」，与「浏览器侧规则是否真删」是两件事。
+function removeRulesByPurpose(purpose) {
   try {
+    const own = (purpose === 'download') ? downloadRuleIds : previewRuleIds;
+    const other = (purpose === 'download') ? previewRuleIds : downloadRuleIds;
+    // 只有「另一方没在用」的 id 才真正移除
+    const ids = Array.from(own).filter((id) => !other.has(id));
+    own.clear();
+    if (ids.length === 0) return;
+    for (const id of ids) activeRuleIds.delete(id);
     if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.updateSessionRules) return;
-    if (activeRuleIds.size === 0) return;
-    const ids = Array.from(activeRuleIds);
-    activeRuleIds.clear();
     chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: ids }, () => void chrome.runtime.lastError);
   } catch (e) { /* ignore */ }
+}
+
+// 精确释放「某个 URL」的规则（供自动下载失败这类单资源路径用）：
+// 不影响同域其它资源，也不受「另一方是否还持有」以外的因素干扰。
+function releaseRule(url, purpose) {
+  try {
+    const id = ruleIdForUrl(url);
+    if (purpose === 'download') downloadRuleIds.delete(id); else previewRuleIds.delete(id);
+    if (!previewRuleIds.has(id) && !downloadRuleIds.has(id)) {
+      activeRuleIds.delete(id);
+      if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.updateSessionRules) return;
+      chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [id] }, () => void chrome.runtime.lastError);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// 预览规则只在「预览关闭」时释放（viewer/popup 主动调用）
+function clearPreviewRefererRule() {
+  removeRulesByPurpose('preview');
+}
+
+// 下载规则只在「下载全部结束 / 下载失败」时释放。
+// 🔴 BUG-1 的核心修正：下载侧清理绝不能碰预览规则，否则预览中的防盗链资源会被 403。
+function clearDownloadRules() {
+  removeRulesByPurpose('download');
 }
 
 // ---------- 下载期间的生命周期管理 + 失败自动回退 ----------
@@ -718,28 +788,29 @@ safeOn(chrome.downloads, 'onChanged', (delta) => {
   const st = delta.state && delta.state.current;
   if (st === 'complete') {
     trackedDownloads.delete(delta.id);
-    if (trackedDownloads.size === 0) clearPreviewRefererRule();
+    if (trackedDownloads.size === 0) clearDownloadRules();
     return;
   }
   if (st === 'interrupted') {
     const info = trackedDownloads.get(delta.id);
     const errCode = (delta.error && delta.error.current) || '';
     trackedDownloads.delete(delta.id);
-    if (trackedDownloads.size === 0) clearPreviewRefererRule();
+    if (trackedDownloads.size === 0) clearDownloadRules();
     // 只对「CDN 拒绝类」错误回退；用户主动取消等不回退（避免打扰）
     if (RETRY_ERROR_CODES.indexOf(errCode) >= 0) openViewerForRetry(info);
   }
 });
 
 function trackDownloadCleanup(id, info) {
-  if (id === undefined || id === null) { clearPreviewRefererRule(); return; }
+  // 下载未拿到 id（发起即失败）→ 只清下载侧规则，不碰预览侧
+  if (id === undefined || id === null) { clearDownloadRules(); return; }
   trackedDownloads.set(id, info || null);
-  // 兜底：3 分钟后无论如何清掉规则，避免长期残留
+  // 兜底：3 分钟后无论如何清掉下载规则，避免长期残留（同样不碰预览规则）
   clearTimeout(downloadCleanupTimer);
   downloadCleanupTimer = setTimeout(() => {
     if (trackedDownloads.size > 0) {
       trackedDownloads.clear();
-      clearPreviewRefererRule();
+      clearDownloadRules();
     }
   }, 180000);
 }
@@ -873,14 +944,20 @@ function pumpAutoDown(tabId) {
     autoDownCount.set(tabId, (autoDownCount.get(tabId) || 0) + 1);
     try {
       if (item.requestHeaders || item.referer) {
-        setPreviewRefererRule(item.url, item.requestHeaders || { referer: item.referer });
+        // 自动下载属于「下载用」规则：与预览规则分账，互不清理
+        setPreviewRefererRule(item.url, item.requestHeaders || { referer: item.referer }, 'download');
       }
       chrome.downloads.download({
         url: item.url,
         filename: safeFilename(item.filename || ''),
         saveAs: false
       }, (id) => {
-        if (chrome.runtime.lastError) return;
+        if (chrome.runtime.lastError) {
+          // BUG-3：发起失败时该资源的规则没人清（也不会走 trackDownloadCleanup 的 180s 兜底），
+          // 必须在这里精确释放，否则 activeRuleIds 会持续残留、规则长期留在浏览器侧。
+          releaseRule(item.url, 'download');
+          return;
+        }
         trackDownloadCleanup(id, item);
       });
     } catch (e) { /* ignore */ }
@@ -1133,10 +1210,11 @@ safeOn(chrome.contextMenus, 'onClicked', (info, tab) => {
       const src = info.srcUrl || '';
       if (!src) return;
       const pageRef = (tab && tab.url) || '';
-      if (pageRef) setPreviewRefererRule(src, { referer: pageRef });
+      // 右键「下载此图片」是下载动作 → 记为下载用规则，避免误清预览规则
+      if (pageRef) setPreviewRefererRule(src, { referer: pageRef }, 'download');
       try {
         chrome.downloads.download({ url: src, saveAs: downloadSaveAs }, (id) => {
-          if (chrome.runtime.lastError) { if (pageRef) clearPreviewRefererRule(); return; }
+          if (chrome.runtime.lastError) { if (pageRef) clearDownloadRules(); return; }
           trackDownloadCleanup(id, { url: src, referer: pageRef, mime: 'image/*' });
         });
       } catch (e) { /* ignore */ }
@@ -1402,7 +1480,9 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
       // 防盗链 CDN 的下载请求不带 Referer 会 403（Edge 把 403 错误页存成 .htm），
       // 因此下载期间用 DNR 会话规则注入 Referer，下载结束自动移除。
       // 文件名先经 safeFilename 清洗，修复超长/非法字符导致下载失败。
-      if (msg.url && (msg.headers || msg.referer)) setPreviewRefererRule(msg.url, msg.headers || msg.referer);
+      // 下载用规则：与预览分账。用户在别处完成下载不会清掉这里正在进行的下载规则，
+      // 下载结束也只清下载侧，绝不打断 viewer 正在进行的预览。
+      if (msg.url && (msg.headers || msg.referer)) setPreviewRefererRule(msg.url, msg.headers || msg.referer, 'download');
       // 文件名模板（P2-1）：未配置则用原文件名（行为与历史一致）
       const tplName = applyFileNameTemplate(fileNameTemplate, {
         title: msg.title, url: msg.url, filename: msg.filename, type: msg.type
@@ -1414,7 +1494,7 @@ safeOn(chrome.runtime, 'onMessage', (msg, sender, sendResponse) => {
         saveAs: downloadSaveAs
       }, (id) => {
         if (chrome.runtime.lastError) {
-          if (msg.url && (msg.headers || msg.referer)) clearPreviewRefererRule();
+          if (msg.url && (msg.headers || msg.referer)) clearDownloadRules();
           sendResponse({ ok: false, error: 'download_failed', message: chrome.runtime.lastError.message });
           return;
         }

@@ -343,11 +343,15 @@ function wildcardToRegex(pat) {
 
 /**
  * URL 黑/白名单判定（基于「发起请求的页面 URL」）。
+ * 注意：列表为空 → 本规则视为不生效（始终放行，返回 false）。
+ * 空列表 = 该规则不生效（始终放行）。这样用户切到白名单模式但还没填条目时，
+ * 不会出现「什么都抓不到」的困惑。
  * @param {string} pageUrl 发起请求的页面 URL（webRequest details.initiator 或 tab URL）
  * @returns {boolean} true=应当屏蔽本页的所有抓取
  */
 function isBlockedPageUrl(pageUrl) {
   const bl = userRules.blockUrl;
+  // 空列表直接放行（白名单模式下同样放行，见函数头说明）
   if (!pageUrl || !bl || !Array.isArray(bl.list) || bl.list.length === 0) return false;
   let hit = false;
   for (const pat of bl.list) {
@@ -368,7 +372,8 @@ function isBlockedPageUrl(pageUrl) {
  */
 function applyUserRules(url, mime, size) {
   let outUrl = String(url || '');
-  // 1) Regex：命中可黑标丢弃 / 改写 URL（只对路径部分匹配，避免查询串误伤）
+  // 1) Regex：命中可黑标丢弃 / 改写 URL（对完整 URL 匹配，含协议与查询串）
+  //    —— 匹配完整 URL（而非仅路径）是有意的：便于按 token/sign 等查询参数做筛选
   for (const r of userRules.Regex) {
     if (!r || r.state === false || !r.regex) continue;
     let re;
@@ -381,7 +386,9 @@ function applyUserRules(url, mime, size) {
       try { outUrl = outUrl.replace(re, r.replaceTo); } catch (e) { /* 忽略改写失败 */ }
     }
   }
-  // 2) Ext：按扩展名覆盖尺寸闸门（size 未知时不判决，交给默认闸门）
+  // 2) Ext：按扩展名覆盖尺寸闸门
+  //    size 未知时按「放行」(keep) 处理——宁可多留、不误删，这是有意的安全取向
+  //    （真实实现：size==null 时跳过尺寸比较直接返回 keep，而非交给默认闸门）
   const lower = outUrl.toLowerCase();
   for (const r of userRules.Ext) {
     if (!r || !r.ext || r.state === false) continue;

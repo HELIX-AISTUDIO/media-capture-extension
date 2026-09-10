@@ -168,6 +168,7 @@
         <label><input type="radio" name="blockMode" value="black"> 黑名单（命中的网站不抓取）</label>
         <label><input type="radio" name="blockMode" value="white"> 白名单（仅命中的网站抓取）</label>
       </div>
+      <p class="hint">提示：<b>列表为空时本条规则不生效（始终放行）</b>——切到白名单模式但还没填条目时，不会出现「什么都抓不到」的情况。</p>
       <textarea id="blockList" placeholder="每行一条，例如：&#10;*://*.example.com/*&#10;https://www.bilibili.com/*"></textarea>
     </section>
 
