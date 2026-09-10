@@ -55,9 +55,9 @@ function parseM3u8(text, baseUrl) {
   for (; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;                 // 空行跳过
-    if (line.startsWith('#')) {
-      // ---------- 注释/标签 ----------
-      if (/^#EXT-X-STREAM-INF/i.test(line)) {
+if (line.startsWith('#')) {
+        // ---------- 注释/标签 ----------
+        if (/^#EXT-X-STREAM-INF/i.test(line)) {
         // 变体播放列表：下一行是子 m3u8 URL
         const info = {
           bandwidth: 0,
@@ -85,13 +85,15 @@ function parseM3u8(text, baseUrl) {
       }
       if (/^#EXTINF/i.test(line)) {
         // 分片时长：下一行是分片 URI
+        // 兼容 BYTERANGE 在 EXTINF 之前出现的写法：保留上一个 pending.byterange
         const m = /([\d.]+)/.exec(line);
-        pending = { duration: m ? parseFloat(m[1]) : 0 };
+        pending = { duration: m ? parseFloat(m[1]) : 0, byterange: pending?.byterange };
         continue;
       }
       if (/^#EXT-X-BYTERANGE/i.test(line)) {
         // 子区间分片：记录 byte range
-        const m = /BYTERANGE=([\d@\d]+)/i.exec(line);
+        // m3u8 标准语法是 BYTERANGE:（冒号），但部分实现写 BYTERANGE=（等号）以兼容；都接受
+        const m = /BYTERANGE\s*[:=]\s*([\d@-]+)/i.exec(line);
         if (pending && m) pending.byterange = m[1];
         else if (m) pending = { duration: 0, byterange: m[1] };
         continue;

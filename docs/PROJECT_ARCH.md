@@ -48,7 +48,13 @@ edge_media_catch_ext/
 ├── lib/                          # 第三方库目录（当前为空，供后续按需引入）
 ├── docs/                         # 项目知识库文档（仅文档，无业务代码）
 │   ├── LEARNINGS.md              # 猫抓源码学习沉淀
-│   └── PROJECT_ARCH.md           # 本文件：目录结构与架构说明
+│   ├── COMPLIANCE.md             # 合规说明
+│   ├── PROJECT_ARCH.md           # 本文件：目录结构与架构说明
+│   └── yt-dlp-bypass/            # 【知识备份·未启用】YouTube 等加密流媒体"页面解析旁路"方案
+│       ├── README.md             #   总览：痛点/双范式/两套方案/关键事实速查
+│       ├── 01-GD3源码机制拆解.md  #   GD3 双进程与 yt_dlp_pack 逐文件源码地图
+│       ├── 02-未来接入点与预留设计.md # 未来大更新施工地图（文件/行号锚点/施工顺序）
+│       └── 03-参考实现备份代码.md  #   可粘贴参考代码（站点判定/background/popup/Node 助手）
 ├── CHANGELOG.md                  # 更新日志
 ├── PRIVACY.md                    # 隐私政策
 └── README.md                     # 项目说明

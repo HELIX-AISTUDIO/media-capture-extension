@@ -481,13 +481,16 @@ function storeResource(tabId, resource) {
   if (!store.has(tabId)) store.set(tabId, new Map());
   const map = store.get(tabId);
 
-  // 限制每 tab 资源数，防止内存泄漏/CPU 占用
-  if (map.size >= MAX_RESOURCES_PER_TAB) return;
-
   // 归一化 key：去掉缓存/分片参数，让同一资源的不同分片/带缓存串的
   // 请求收敛成一条（参考猫抓对 bytestart 分片的归一化思路）。
   const key = normalizeUrl(resource.url);
   const existing = map.get(key);
+
+  // 限制每 tab 资源数，防止内存泄漏/CPU 占用。
+  // 上限只对「新增 key」生效：旧实现把 return 放在取 existing 之前，
+  // 导致 tab 满 500 后既有条目的 size/mime/referer/requestHeaders 补全
+  // 被一并丢弃（条目永远停在首次入库时的残缺状态）。这里保留合并补全通路。
+  if (!existing && map.size >= MAX_RESOURCES_PER_TAB) return;
   if (existing) {
     // 合并：DOM 来源优先；取更大 size；补全缺失字段
     if (existing.source === 'network' && resource.source !== 'network') {

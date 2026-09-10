@@ -39,10 +39,6 @@
     "message": "音频",
     "description": "Filter: audio"
   },
-  "popup_filter_stream": {
-    "message": "流媒体",
-    "description": "Filter: stream"
-  },
   "popup_btn_refresh": {
     "message": "刷新",
     "description": "Refresh button"

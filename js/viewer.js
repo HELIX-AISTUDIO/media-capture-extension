@@ -107,12 +107,19 @@ async function applyRefererRule(referer) {
   } catch (e) { return false; }
 }
 
+// 简易 HTML 转义：failCard 走 innerHTML 拼接，msg 里可能带服务端返回的文本
+// （状态码、错误描述等），先转义再拼，消除 latent XSS 面（如 <img onerror=...>）。
+function escapeHtml(s) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => map[c]);
+}
+
 function failCard(msg) {
   const stage = document.getElementById('stage');
   if (!stage) return;
   stage.innerHTML = `
     <div class="card">
-      <div class="warn">⚠ ${msg}</div>
+      <div class="warn">⚠ ${escapeHtml(msg)}</div>
       <div class="hint">${t('viewer_fail_reason', '可能原因：CDN 强校验 Referer / 链接带时效签名已过期 / DRM 加密')}</div>
       <div class="actions" style="margin-top:14px;">
         <button class="ghost" id="copyBtn">${t('viewer_btn_copy', '复制链接')}</button>

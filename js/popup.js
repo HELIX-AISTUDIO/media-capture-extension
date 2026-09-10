@@ -945,8 +945,19 @@ document.querySelectorAll('.filter').forEach((btn) => {
   });
 });
 
-document.getElementById('keyword').addEventListener('input', render);
-document.getElementById('sizeFilter').addEventListener('input', render);
+// 关键词 / 大小筛选：input 是高频事件，资源多时每次按键都会全量重建列表并让
+// 所有缩略图重新加载。这里加 200ms 防抖，只作用于这两个输入框；
+// 类型标签、排序、清空等仍即时响应，不受影响。
+function debounceRender(wait) {
+  let timer = null;
+  return function debouncedRender() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; render(); }, wait);
+  };
+}
+const renderDebounced = debounceRender(200);
+document.getElementById('keyword').addEventListener('input', renderDebounced);
+document.getElementById('sizeFilter').addEventListener('input', renderDebounced);
 document.getElementById('sortOrder').addEventListener('change', (e) => {
   currentSort = e.target.value;
   render();

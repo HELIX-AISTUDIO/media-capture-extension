@@ -39,10 +39,6 @@
     "message": "Audio",
     "description": "Filter: audio"
   },
-  "popup_filter_stream": {
-    "message": "Streams",
-    "description": "Filter: stream"
-  },
   "popup_btn_refresh": {
     "message": "Refresh",
     "description": "Refresh button"

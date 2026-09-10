@@ -4,6 +4,33 @@
 > 分类按版本内容使用 ✨ 新增、🔧 优化、🐛 修复、📝 更新等标签。
 > 每次发布时，请保证：`CHANGELOG.md 版本号 = git tag 版本号 = manifest.json version`。
 
+## v0.3.4 2026-09-10
+
+✨ 新增
+- **零依赖打包 + 完整性校验脚本** `tools/build.js`：从 `manifest.json` 读版本号打 `dist/<name>-v<version>.zip`；打包后扫描 JS 中的 `img/*.png` 引用并校验文件存在——防漏打包（如暂停态灰图标 `img/gray16/48/128.png` 只在 JS 中引用、不在 manifest 声明）。支持 `--check-only` 只校验不打包
+- **最小测试基础设施** `tests/`：用 Node 22 内置 `node --test`（零依赖）覆盖纯函数。`tests/helpers/loader.js` 用 vm 把 `js/media-parser.js` / `js/m3u8-parser.js` / `js/mpd-parser.js` 载入沙箱测试；当前覆盖 `classify / normalizeUrl / safeFilename / operatorCheck / wildcardToRegex / parseM3u8 / resolveUrl` 共 **37 条**断言
+- **V2.0 施工地图** `docs/yt-dlp-bypass/`：为未来「页面解析旁路 / yt-dlp」大更新沉淀完整方案（GD3 源码拆解 / 接入点与预留设计 / 参考实现备份代码）。锚点以 v0.3.3 为基线、**11 个锚点已全部用「可搜索的代码特征」重新 grep 复核**，行号仅作辅助
+- **违规拦截**：批量校验
+
+🔧 优化
+- **合规措辞细化**（参考你认可的定性）：
+  - `docs/COMPLIANCE.md`：把「不绕过防盗链」细化为「不解析加密流、不破解 DRM、不伪造或破解鉴权凭据；防盗链 CDN 仅复用页面自身已发送过的请求头（Referer/Cookie/Origin）」，新增「DNR 注入 Referer/Cookie」专列说明
+  - 同步 README.md 目录树 / PROJECT_ARCH.md 模块说明
+- **弹窗渲染防抖**（P2-6）：`js/popup.js` 关键词/大小筛选输入加 200ms 防抖——之前输入即全量重建列表并让缩略图重载
+- **`storeResource` 上限只对新增 key 生效**（P2-3）：旧实现把 500 上限判断放在 `get(existing)` 之前，导致 tab 满后既有条目的 `size/mime/referer/requestHeaders` 补全被一并丢弃（条目永远停在首次入库时的残缺状态）；现改为"仅无 existing 且 size≥上限 才 return"，保留合并补全通路
+
+🐛 修复（新增测试套件首批跑出的真 bug，验证了测试基础设施的价值）
+- **m3u8 `BYTERANGE` 完全无效**：`js/m3u8-parser.js` 的正则写的是 `/BYTERANGE=([\d@\d]+)/i`（**等号**），但 m3u8 标准语法是 `#EXT-X-BYTERANGE:`（**冒号**），导致 m= null 永远不命中、byterange 字段从未被记录。现改为 `/BYTERANGE\s*[:=]\s*([\d@-]+)/i` 兼容两种写法。同时让 EXTINF 分支保留上一个 `pending.byterange`，兼容 BYTERANGE 出现在 EXTINF 之前的非标写法
+- **viewer 失败卡片 latent XSS**（P2-7）：`js/viewer.js` 的 `failCard` 用未转义的 `msg` 拼 `innerHTML`，msg 虽目前来源安全但属 latent XSS 面——加 `escapeHtml` 消除
+- **`storeResource` 满 500 后阻断补全**（与上面🔧 同源）——已通过 P2-3 修复
+
+📝 更新
+- 版本号 0.3.3 → 0.3.4（**无新增权限**）
+- 移除「流媒体」筛选标签：popup.html 与 `_locales/*` 共 3 处删除（按你的决策）；解析功能代码（`doParse` / `handleParseM3u8` / `handleParseMpd`）按"暂不清理"保留供 V2.0 参考
+- 目录树新增 `docs/yt-dlp-bypass/`、`tools/build.js`、`tests/` 三项
+
+---
+
 ## v0.3.3 2026-09-10
 
 ✨ 新增

@@ -98,7 +98,8 @@ edge_media_catch_ext/
 ├── lib/                          # 第三方库目录（当前为空，供后续按需引入）
 ├── docs/
 │   ├── LEARNINGS.md              # 猫抓源码学习沉淀
-│   └── PROJECT_ARCH.md           # 项目目录结构与架构说明
+│   ├── PROJECT_ARCH.md           # 项目目录结构与架构说明
+│   └── yt-dlp-bypass/            # 【知识备份·未启用】YouTube 页面解析旁路方案（见该目录 README）
 ├── CHANGELOG.md                  # 更新日志（最新版本在最上方）
 └── README.md
 ```
